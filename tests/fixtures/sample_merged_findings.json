@@ -1,0 +1,74 @@
+{
+  "merged_findings": [
+    {
+      "finding": {
+        "finding_id": "TB-001",
+        "source": {
+          "track": "B",
+          "tool": "ghidra",
+          "analysis_dimension": "dangerous_functions",
+          "agent_id": "track-b-ai"
+        },
+        "vulnerability": {
+          "title": "Unchecked copy into fixed stack buffer",
+          "cwe_id": "CWE-120",
+          "severity": "high",
+          "confidence": 0.82
+        },
+        "location": {
+          "binary": "/usr/bin/sampled",
+          "function": "parse_request",
+          "address_offset": "0x4012ab",
+          "line_offset": 0
+        },
+        "evidence": {
+          "description": "The decompiled function copies attacker-controlled input into a fixed stack buffer without checking the source length.",
+          "raw_output": "strcpy(local_80, user_input);",
+          "supporting_files": [
+            "ghidra/parse_request.c"
+          ],
+          "reproduction_hint": "Pass an oversized request field."
+        },
+        "attack_surface": {
+          "type": "network",
+          "entry_point": "tcp/8080 request parser"
+        },
+        "verification": {
+          "poc_status": "untested"
+        },
+        "remediation": {
+          "suggestion": "Replace the unbounded copy with length-checked parsing and reject oversized request fields before copying.",
+          "effort": "medium",
+          "references": [
+            "https://cwe.mitre.org/data/definitions/120.html"
+          ]
+        },
+        "references": [
+          "https://cwe.mitre.org/data/definitions/120.html"
+        ],
+        "metadata": {
+          "scan_id": "BBH-20260627-a1b2c3",
+          "detection_time_ms": 1200,
+          "tool_version": "ghidra-headless"
+        }
+      },
+      "dedup_info": {
+        "merged_from": [
+          "TB-001"
+        ],
+        "rule": "single-source"
+      }
+    }
+  ],
+  "dedup_stats": {
+    "input": 1,
+    "output": 1
+  },
+  "confidence_scores": {
+    "TB-001": 0.82
+  },
+  "coverage_summary": {
+    "binaries_seen": 1,
+    "binaries_analyzed": 1
+  }
+}

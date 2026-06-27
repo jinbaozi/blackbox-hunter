@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/scan_strategy.json",
+  "title": "Scan Strategy",
+  "type": "object",
+  "required": ["scan_id", "mode", "track_a_tools", "track_b_focus"],
+  "properties": {
+    "scan_id": { "type": "string", "pattern": "^BBH-[0-9]{8}-[a-z0-9]{6}$" },
+    "mode": { "type": "string", "enum": ["quick", "standard", "deep", "full"] },
+    "track_a_tools": { "type": "array", "items": { "type": "object", "required": ["name", "timeout_sec"], "properties": { "name": { "type": "string" }, "args": { "type": "string" }, "timeout_sec": { "type": "integer", "minimum": 1 } } } },
+    "track_b_focus": { "type": "array", "items": { "type": "string" } },
+    "disassembly_engine": { "type": "string", "enum": ["ghidra", "radare2", "objdump", "strings_only"] },
+    "attack_surfaces": { "type": "array", "items": { "type": "object", "properties": { "type": { "type": "string" }, "identifier": { "type": "string" }, "priority": { "type": "string", "enum": ["high", "medium", "low"] } } } },
+    "estimated_duration_min": { "type": "integer", "minimum": 0 },
+    "token_budget": { "type": "integer", "minimum": 0 }
+  }
+}

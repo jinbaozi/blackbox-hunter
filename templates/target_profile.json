@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/target_profile.json",
+  "title": "Target Package Profile",
+  "type": "object",
+  "required": ["scan_id", "package", "extraction", "binaries", "attack_surface", "architectures"],
+  "additionalProperties": false,
+  "properties": {
+    "scan_id": { "type": "string", "pattern": "^BBH-[0-9]{8}-[a-z0-9]{6}$" },
+    "package": {
+      "type": "object",
+      "required": ["path", "type", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string" },
+        "type": { "type": "string", "enum": ["deb", "rpm"] },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "architecture": { "type": "string" },
+        "size_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "extraction": {
+      "type": "object",
+      "required": ["status", "root"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string", "enum": ["success", "partial", "failed"] },
+        "root": { "type": "string" },
+        "method": { "type": "string" },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "binaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "elf", "architecture"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string" },
+          "elf": { "type": "boolean" },
+          "architecture": { "type": "string" },
+          "bitness": { "type": "integer", "enum": [32, 64] },
+          "stripped": { "type": "boolean" },
+          "setuid": { "type": "boolean" },
+          "network_facing": { "type": "boolean" },
+          "priority": { "type": "integer", "minimum": 0, "maximum": 100 }
+        }
+      }
+    },
+    "attack_surface": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "entry_point"],
+        "additionalProperties": false,
+        "properties": {
+          "type": { "type": "string", "enum": ["network", "cli", "file", "ipc", "config", "env", "library"] },
+          "entry_point": { "type": "string" },
+          "evidence": { "type": "string" }
+        }
+      }
+    },
+    "architectures": { "type": "array", "items": { "type": "string" } },
+    "metadata": { "type": "object", "additionalProperties": true }
+  }
+}

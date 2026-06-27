@@ -1,0 +1,38 @@
+version: "3.8"
+
+services:
+  poc-sandbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.poc
+      args:
+        TARGETARCH: ${TARGETARCH:-amd64}
+    container_name: bbh-poc-sandbox
+    network_mode: "none"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=seccomp-profile.json
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=256m
+      - /workspace:size=512m,uid=1000,gid=1000
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "2.0"
+          pids: 100
+    volumes:
+      - type: bind
+        source: ${POC_DIR:-./poc}
+        target: /poc
+        read_only: true
+      - type: bind
+        source: ${PACKAGE_DIR:-./pkg}
+        target: /pkg
+        read_only: true
+    environment:
+      POC_SCRIPT: ${POC_SCRIPT:-/poc/run.sh}
+      TIMEOUT: ${TIMEOUT:-300}

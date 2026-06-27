@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/finding.json",
+  "title": "BlackBox Hunter Finding",
+  "description": "Unified finding schema for inter-agent data exchange",
+  "type": "object",
+  "required": ["finding_id", "source", "vulnerability", "location", "evidence", "verification", "remediation"],
+  "additionalProperties": false,
+  "properties": {
+    "finding_id": { "type": "string", "pattern": "^(TA|TB)-[0-9]{3,}$", "description": "Unique ID with current valid track prefixes: TA=Track A, TB=Track B." },
+    "source": { "type": "object", "required": ["track", "tool"], "additionalProperties": false, "properties": { "track": { "type": "string", "enum": ["A", "B"] }, "tool": { "type": "string" }, "analysis_dimension": { "type": "string" }, "agent_id": { "type": "string" } } },
+    "vulnerability": { "type": "object", "required": ["title", "severity", "confidence"], "additionalProperties": false, "properties": { "title": { "type": "string", "minLength": 10 }, "cwe_id": { "type": "string", "pattern": "^CWE-[0-9]+$" }, "cve_id": { "type": "string", "pattern": "^CVE-[0-9]{4}-[0-9]+$" }, "severity": { "type": "string", "enum": ["critical", "high", "medium", "low", "info"] }, "confidence": { "type": "number", "minimum": 0, "maximum": 1 } } },
+    "location": { "type": "object", "required": ["binary"], "additionalProperties": false, "properties": { "binary": { "type": "string" }, "function": { "type": "string" }, "file": { "type": "string" }, "line_offset": { "type": "integer", "minimum": 0 }, "address_offset": { "type": "string", "pattern": "^0x[0-9a-fA-F]+$" } } },
+    "evidence": { "type": "object", "required": ["description"], "additionalProperties": false, "properties": { "description": { "type": "string", "minLength": 20 }, "raw_output": { "type": "string" }, "supporting_files": { "type": "array", "items": { "type": "string" } }, "reproduction_hint": { "type": "string" } } },
+    "attack_surface": { "type": "object", "additionalProperties": false, "properties": { "type": { "type": "string", "enum": ["network", "cli", "file", "ipc", "config", "env", "library"] }, "entry_point": { "type": "string" } } },
+    "verification": { "type": "object", "required": ["poc_status"], "additionalProperties": false, "properties": { "poc_status": { "type": "string", "enum": ["untested", "verified", "failed", "skipped"] }, "poc_result": { "type": "object" }, "crash_signal": { "type": "string" }, "verified_at": { "type": "string", "format": "date-time" } } },
+    "remediation": { "type": "object", "required": ["suggestion", "effort"], "additionalProperties": false, "properties": { "suggestion": { "type": "string", "minLength": 20 }, "effort": { "type": "string", "enum": ["low", "medium", "high"] }, "references": { "type": "array", "items": { "type": "string" } } } },
+    "references": { "type": "array", "description": "External references such as NVD, vendor advisory, exploit-db, or CWE links", "items": { "type": "string" } },
+    "metadata": { "type": "object", "additionalProperties": true, "properties": { "detection_time_ms": { "type": "integer", "minimum": 0 }, "tool_version": { "type": "string" }, "scan_id": { "type": "string", "pattern": "^BBH-[0-9]{8}-[a-z0-9]{6}$" } } }
+  }
+}

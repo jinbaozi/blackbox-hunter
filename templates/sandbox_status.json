@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/sandbox_status.json",
+  "title": "Sandbox Status",
+  "type": "object",
+  "required": ["docker_available", "podman_available", "sandbox_ready", "limitations"],
+  "properties": { "docker_available": { "type": "boolean" }, "podman_available": { "type": "boolean" }, "sandbox_ready": { "type": "boolean" }, "engine_version": { "type": "string" }, "engine": { "type": "string", "enum": ["docker", "podman", "none"] }, "limitations": { "type": "array", "items": { "type": "string" } } }
+}

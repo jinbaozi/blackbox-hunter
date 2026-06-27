@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/coverage_report.json",
+  "title": "Coverage Report",
+  "type": "object",
+  "required": ["binary_coverage_pct", "config_coverage_pct", "dependency_coverage_pct", "attack_surface_coverage_pct", "tool_coverage_pct", "gaps"],
+  "properties": { "binary_coverage_pct": { "type": "number", "minimum": 0, "maximum": 100 }, "config_coverage_pct": { "type": "number", "minimum": 0, "maximum": 100 }, "dependency_coverage_pct": { "type": "number", "minimum": 0, "maximum": 100 }, "attack_surface_coverage_pct": { "type": "number", "minimum": 0, "maximum": 100 }, "tool_coverage_pct": { "type": "number", "minimum": 0, "maximum": 100 }, "gaps": { "type": "array", "items": { "type": "object" } } }
+}

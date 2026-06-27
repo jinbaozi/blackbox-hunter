@@ -1,0 +1,25 @@
+{
+  "scan_id": "BBH-20260627-a1b2c3",
+  "current_phase": "phase_2",
+  "phase_status": {
+    "phase_0": {
+      "status": "done",
+      "retry_count": 0
+    },
+    "track_a": {
+      "status": "done",
+      "retry_count": 0
+    },
+    "track_b": {
+      "status": "done",
+      "retry_count": 0
+    },
+    "phase_2": {
+      "status": "running",
+      "retry_count": 0
+    }
+  },
+  "started_at": "2026-06-27T00:00:00Z",
+  "updated_at": "2026-06-27T00:15:00Z",
+  "error_log": []
+}

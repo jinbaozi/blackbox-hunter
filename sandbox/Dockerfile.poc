@@ -1,0 +1,17 @@
+# BlackBox Hunter - PoC Execution Sandbox
+FROM ubuntu:22.04
+
+ARG TARGETARCH=amd64
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN case "$TARGETARCH" in       amd64|arm64) echo "native apt architecture: $TARGETARCH" ;;       *) echo "best-effort architecture: $TARGETARCH" ;;     esac     && apt-get update     && apt-get install -y --no-install-recommends       strace ltrace gdb tcpdump procps iproute2 net-tools file       python3 python3-pip curl ca-certificates rpm     && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -s /bin/bash poctest     && mkdir -p /workspace /workspace/results     && chown -R poctest:poctest /workspace
+
+COPY monitor.sh /opt/monitor.sh
+COPY run_poc.sh /opt/run_poc.sh
+RUN chmod +x /opt/monitor.sh /opt/run_poc.sh
+
+WORKDIR /workspace
+USER poctest
+CMD ["/opt/run_poc.sh"]

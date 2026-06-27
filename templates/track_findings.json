@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/track_findings.json",
+  "title": "Track Findings Wrapper",
+  "type": "object",
+  "required": ["agent_id", "agent_role", "phase", "status", "findings", "findings_count", "warnings", "execution_time_ms", "metadata"],
+  "properties": { "agent_id": { "type": "string" }, "agent_role": { "type": "string" }, "phase": { "type": "string", "enum": ["track_a", "track_b"] }, "status": { "type": "string", "enum": ["success", "partial", "failed", "skipped"] }, "findings": { "type": "array", "items": { "$ref": "finding.json" } }, "findings_count": { "type": "integer", "minimum": 0 }, "warnings": { "type": "array", "items": { "type": "string" } }, "execution_time_ms": { "type": "integer", "minimum": 0 }, "metadata": { "type": "object", "additionalProperties": true, "properties": { "tools_executed": { "type": "array", "items": { "type": "string" } }, "dimensions_analyzed": { "type": "array", "items": { "type": "string" } }, "functions_analyzed": { "type": "integer", "minimum": 0 }, "token_usage": { "type": "object" } } } }
+}

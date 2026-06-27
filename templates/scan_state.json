@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/scan_state.json",
+  "title": "Scan State",
+  "type": "object",
+  "required": ["scan_id", "current_phase", "phase_status", "started_at", "updated_at", "error_log"],
+  "properties": {
+    "scan_id": { "type": "string", "pattern": "^BBH-[0-9]{8}-[a-z0-9]{6}$" },
+    "current_phase": { "type": "string", "enum": ["idle", "phase_0", "track_a", "track_b", "phase_2", "phase_3", "phase_4", "completed", "failed"] },
+    "phase_status": { "type": "object", "additionalProperties": { "type": "object", "required": ["status"], "properties": { "status": { "type": "string", "enum": ["pending", "running", "done", "failed", "skipped"] }, "started_at": { "type": "string", "format": "date-time" }, "completed_at": { "type": "string", "format": "date-time" }, "error_message": { "type": "string" }, "retry_count": { "type": "integer", "minimum": 0 } } } },
+    "started_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "error_log": { "type": "array", "items": { "type": "object" } }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "docker_available": true,
+  "podman_available": false,
+  "sandbox_ready": true,
+  "engine_version": "25.0.0",
+  "engine": "docker",
+  "limitations": []
+}

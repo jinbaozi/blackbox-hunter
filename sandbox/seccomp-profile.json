@@ -1,0 +1,10 @@
+{
+  "defaultAction": "SCMP_ACT_ERRNO",
+  "architectures": ["SCMP_ARCH_X86_64", "SCMP_ARCH_AARCH64"],
+  "syscalls": [
+    { "names": ["read", "write", "open", "close", "stat", "fstat", "lstat", "poll", "lseek", "mmap", "mprotect", "munmap", "brk", "ioctl", "access", "pipe", "select", "sched_yield", "dup", "dup2", "nanosleep", "getpid", "socket", "connect", "accept", "sendto", "recvfrom", "bind", "listen", "getsockname", "getpeername", "socketpair", "setsockopt", "getsockopt", "clone", "fork", "vfork", "execve", "exit", "wait4", "kill", "uname", "fcntl", "flock", "fsync", "fdatasync", "truncate", "ftruncate", "getdents", "getcwd", "chdir", "rename", "mkdir", "rmdir", "link", "unlink", "symlink", "readlink", "chmod", "chown", "lchown", "getuid", "getgid", "geteuid", "getegid", "getppid", "getpgrp", "setsid", "setuid", "setgid", "getgroups", "setgroups", "setresuid", "setresgid", "getresuid", "getresgid", "sigaltstack", "rt_sigaction", "rt_sigprocmask", "rt_sigreturn", "getpriority", "setpriority", "getrlimit", "getrusage", "times", "gettimeofday", "clock_gettime", "clock_getres", "clock_nanosleep", "exit_group", "epoll_wait", "epoll_ctl", "epoll_create1", "openat", "mkdirat", "newfstatat", "unlinkat", "renameat", "readlinkat", "fchmodat", "fchownat", "faccessat", "pselect6", "ppoll", "set_robust_list", "eventfd2", "pipe2", "getrandom", "prlimit64", "statx", "rseq", "close_range", "faccessat2"], "action": "SCMP_ACT_ALLOW" },
+    { "names": ["ptrace", "process_vm_readv", "process_vm_writev"], "action": "SCMP_ACT_ALLOW" },
+    { "names": ["mount", "umount2", "pivot_root", "swapon", "swapoff"], "action": "SCMP_ACT_ERRNO" },
+    { "names": ["reboot", "kexec_load", "init_module", "delete_module"], "action": "SCMP_ACT_ERRNO" }
+  ]
+}

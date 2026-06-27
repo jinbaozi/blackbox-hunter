@@ -1,0 +1,162 @@
+{
+  "registry_version": 1,
+  "tools": [
+    {
+      "name": "cve-bin-tool",
+      "version_min": "3.0",
+      "install_cmds": {
+        "apt": "pip install cve-bin-tool",
+        "brew": "pip install cve-bin-tool",
+        "fallback": "pip install --user cve-bin-tool"
+      },
+      "detect_cmd": "cve-bin-tool --version",
+      "category": "cve_scan",
+      "priority": "required",
+      "fallbacks": ["trivy", "grype"],
+      "platform": ["linux", "darwin"],
+      "needs_network": true
+    },
+    {
+      "name": "checksec",
+      "version_min": "2.0",
+      "install_cmds": {
+        "apt": "sudo apt-get install -y checksec",
+        "brew": "brew install checksec",
+        "fallback": "pip install checksec"
+      },
+      "detect_cmd": "checksec --version",
+      "category": "hardening",
+      "priority": "required",
+      "fallbacks": ["hardening-check"],
+      "platform": ["linux", "darwin"],
+      "needs_network": false
+    },
+    {
+      "name": "cwe_checker",
+      "version_min": "0.7",
+      "install_cmds": {
+        "docker": "docker pull fkiecad/cwe_checker"
+      },
+      "detect_cmd": "docker run --rm fkiecad/cwe_checker --version",
+      "category": "binary_defect",
+      "priority": "high",
+      "fallbacks": ["radare2"],
+      "platform": ["linux"],
+      "needs_network": true
+    },
+    {
+      "name": "binwalk",
+      "version_min": "2.3",
+      "install_cmds": {
+        "apt": "pip install binwalk",
+        "brew": "brew install binwalk",
+        "fallback": "pip install --user binwalk"
+      },
+      "detect_cmd": "binwalk --version",
+      "category": "file_analysis",
+      "priority": "medium",
+      "fallbacks": [],
+      "platform": ["linux", "darwin"],
+      "needs_network": true
+    },
+    {
+      "name": "yara",
+      "version_min": "4.0",
+      "install_cmds": {
+        "apt": "sudo apt-get install -y yara",
+        "brew": "brew install yara"
+      },
+      "detect_cmd": "yara --version",
+      "category": "pattern_scan",
+      "priority": "high",
+      "fallbacks": [],
+      "platform": ["linux", "darwin"],
+      "needs_network": false
+    },
+    {
+      "name": "lintian",
+      "version_min": "2.0",
+      "install_cmds": {
+        "apt": "sudo apt-get install -y lintian"
+      },
+      "detect_cmd": "lintian --version",
+      "category": "config_audit",
+      "priority": "high",
+      "fallbacks": [],
+      "platform": ["linux"],
+      "applies_to": "deb",
+      "needs_network": false
+    },
+    {
+      "name": "rpmlint",
+      "version_min": "2.0",
+      "install_cmds": {
+        "apt": "sudo apt-get install -y rpmlint",
+        "dnf": "sudo dnf install -y rpmlint"
+      },
+      "detect_cmd": "rpmlint --version",
+      "category": "config_audit",
+      "priority": "high",
+      "fallbacks": [],
+      "platform": ["linux"],
+      "applies_to": "rpm",
+      "needs_network": false
+    },
+    {
+      "name": "radare2",
+      "version_min": "5.0",
+      "install_cmds": {
+        "apt": "sudo apt-get install -y radare2",
+        "brew": "brew install radare2"
+      },
+      "detect_cmd": "r2 -v",
+      "category": "disassembly",
+      "priority": "high",
+      "fallbacks": ["objdump"],
+      "platform": ["linux", "darwin"],
+      "needs_network": false
+    },
+    {
+      "name": "ghidra",
+      "version_min": "11.0",
+      "install_cmds": {
+        "snap": "sudo snap install ghidra",
+        "manual": "echo 'Ghidra requires manual installation from https://ghidra-sre.org'"
+      },
+      "detect_cmd": "which analyzeHeadless",
+      "category": "disassembly",
+      "priority": "medium",
+      "fallbacks": ["radare2", "objdump"],
+      "platform": ["linux", "darwin"],
+      "needs_network": true
+    },
+    {
+      "name": "docker",
+      "version_min": "20.0",
+      "install_cmds": {
+        "apt": "sudo apt-get install -y docker.io",
+        "script": "curl -fsSL https://get.docker.com | sh"
+      },
+      "detect_cmd": "docker --version",
+      "category": "sandbox",
+      "priority": "required_verify",
+      "fallbacks": ["podman"],
+      "platform": ["linux"],
+      "needs_network": true
+    },
+    {
+      "name": "podman",
+      "version_min": "4.0",
+      "install_cmds": {
+        "apt": "sudo apt-get install -y podman",
+        "brew": "brew install podman"
+      },
+      "detect_cmd": "podman --version",
+      "category": "sandbox",
+      "priority": "optional",
+      "fallbacks": [],
+      "platform": ["linux"],
+      "needs_network": false
+    }
+  ]
+}

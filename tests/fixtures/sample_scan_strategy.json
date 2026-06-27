@@ -1,0 +1,30 @@
+{
+  "scan_id": "BBH-20260627-a1b2c3",
+  "mode": "standard",
+  "track_a_tools": [
+    {
+      "name": "checksec",
+      "args": "--file",
+      "timeout_sec": 60
+    },
+    {
+      "name": "strings_yara",
+      "timeout_sec": 120
+    }
+  ],
+  "track_b_focus": [
+    "/usr/bin/sampled",
+    "dangerous_functions",
+    "input_validation"
+  ],
+  "disassembly_engine": "ghidra",
+  "attack_surfaces": [
+    {
+      "type": "network",
+      "identifier": "tcp/8080",
+      "priority": "high"
+    }
+  ],
+  "estimated_duration_min": 30,
+  "token_budget": 50000
+}

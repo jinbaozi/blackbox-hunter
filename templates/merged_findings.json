@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/merged_findings.json",
+  "title": "Merged Findings",
+  "type": "object",
+  "required": ["merged_findings", "dedup_stats", "confidence_scores", "coverage_summary"],
+  "properties": { "merged_findings": { "type": "array", "items": { "type": "object", "required": ["finding", "dedup_info"], "properties": { "finding": { "$ref": "finding.json" }, "dedup_info": { "type": "object", "properties": { "merged_from": { "type": "array", "items": { "type": "string" } }, "rule": { "type": "string" } } } } } }, "dedup_stats": { "type": "object" }, "confidence_scores": { "type": "object" }, "coverage_summary": { "type": "object" } }
+}

@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/verified_findings.json",
+  "title": "Verified Findings",
+  "type": "object",
+  "required": ["verified_findings", "verification_stats", "sandbox_info"],
+  "properties": { "verified_findings": { "type": "array", "items": { "type": "object", "properties": { "finding": { "$ref": "finding.json" }, "poc_result": { "type": "object" } } } }, "verification_stats": { "type": "object" }, "sandbox_info": { "$ref": "sandbox_status.json" } }
+}

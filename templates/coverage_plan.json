@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/coverage_plan.json",
+  "title": "Coverage Plan",
+  "type": "object",
+  "required": ["scan_id", "mode", "targets", "tracks"],
+  "additionalProperties": false,
+  "properties": {
+    "scan_id": { "type": "string", "pattern": "^BBH-[0-9]{8}-[a-z0-9]{6}$" },
+    "mode": { "type": "string", "enum": ["quick", "standard", "deep", "full"] },
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "priority", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string" },
+          "priority": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "reason": { "type": "string" },
+          "architecture": { "type": "string" }
+        }
+      }
+    },
+    "tracks": {
+      "type": "object",
+      "required": ["track_a", "track_b"],
+      "additionalProperties": false,
+      "properties": {
+        "track_a": { "type": "array", "items": { "type": "string" } },
+        "track_b": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "limits": { "type": "object", "additionalProperties": true }
+  }
+}

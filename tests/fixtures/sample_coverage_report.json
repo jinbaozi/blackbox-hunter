@@ -1,0 +1,8 @@
+{
+  "binary_coverage_pct": 100,
+  "config_coverage_pct": 80,
+  "dependency_coverage_pct": 75,
+  "attack_surface_coverage_pct": 100,
+  "tool_coverage_pct": 90,
+  "gaps": []
+}

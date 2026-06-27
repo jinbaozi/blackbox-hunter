@@ -1,0 +1,42 @@
+{
+  "scan_id": "BBH-20260627-a1b2c3",
+  "package": {
+    "path": "/tmp/sample.deb",
+    "type": "deb",
+    "name": "sample",
+    "version": "1.0.0",
+    "architecture": "amd64",
+    "size_bytes": 4096
+  },
+  "extraction": {
+    "status": "success",
+    "root": "/workspace/BBH-20260627-a1b2c3/extracted",
+    "method": "dpkg-deb",
+    "warnings": []
+  },
+  "binaries": [
+    {
+      "path": "/usr/bin/sampled",
+      "elf": true,
+      "architecture": "x86_64",
+      "bitness": 64,
+      "stripped": true,
+      "setuid": false,
+      "network_facing": true,
+      "priority": 91
+    }
+  ],
+  "attack_surface": [
+    {
+      "type": "network",
+      "entry_point": "tcp/8080",
+      "evidence": "systemd socket and strings output"
+    }
+  ],
+  "architectures": [
+    "x86_64"
+  ],
+  "metadata": {
+    "generated_by": "smoke_test"
+  }
+}
