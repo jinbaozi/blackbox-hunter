@@ -4,11 +4,19 @@
 
 Verify feasible findings inside the Docker sandbox and emit `verified_findings.json`.
 
+## Inputs
+
+- `$SCAN_ROOT/env_check.json`
+- `$SCAN_ROOT/merged_findings.json`
+- `$SCAN_ROOT/sandbox_status.json`
+
 ## Sandbox Rules
 
 Use `sandbox/docker-compose.sandbox.yml`. The container runs as user `poctest`, has `network_mode: none`, and uses the provided seccomp profile. The runner owns timeout enforcement through `sandbox/run_poc.sh`.
 
 ## Verification Flow
+
+Before selecting findings, read `env_check.json.block_decision.phase_blocks`. If Phase 3 is blocked because Docker/Podman or another sandbox runtime is unavailable, mark Phase 3 as `skipped`, write the reason to `scan_state.json.error_log`, and continue to Phase 4 with unverified findings clearly labeled.
 
 1. Select findings with enough reproduction detail and acceptable risk.
 2. Create one PoC testcase from `templates/poc_testcase.md` per finding.

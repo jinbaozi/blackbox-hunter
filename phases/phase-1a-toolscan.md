@@ -4,11 +4,20 @@
 
 Run deterministic tools against the extracted package and emit `track_a_findings.json` using `templates/track_findings.json`.
 
+## Inputs
+
+- `$SCAN_ROOT/env_check.json`
+- `$SCAN_ROOT/target_profile.json`
+- `$SCAN_ROOT/scan_strategy.json`
+- `$SCAN_ROOT/coverage_plan.json`
+
 ## CVE Database Mode
 
 Use `cve-bin-tool --update now` only when network is available and the user has approved live updates. Otherwise use the local CVE cache. If the local cache is older than 14 days, continue in offline mode but add a warning and cap CVE-derived confidence at `0.75`.
 
 ## Tool Execution
+
+Execute only tools whose preflight status is `available` or `fallback_active`. For tools marked `missing`, `version_low`, or `install_failed`, add a warning to the Track A output and lower confidence according to the degradation rules instead of emitting empty success output.
 
 - `cve-bin-tool`: package and binary CVE hints.
 - `checksec`: hardening flags for ELF binaries.
@@ -16,6 +25,8 @@ Use `cve-bin-tool --update now` only when network is available and the user has 
 - `strings` plus YARA: dangerous functions, secrets, and config pattern scans.
 - `lintian` or `rpmlint`: package metadata and maintainer script issues.
 - dependency checks: parse package metadata and shared library imports.
+
+When `env_check.json` contains `block_decision.warnings`, propagate relevant tool degradation notes into `track_a_findings.json.warnings`.
 
 ## Sandbox Boundary
 

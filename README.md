@@ -22,6 +22,20 @@ BlackBox Hunter 是一个面向 `.deb` / `.rpm` 软件包的黑盒漏洞分析 S
 
 ### 1. 软件包画像
 
+### Phase -1: 环境预检 (Preflight)
+
+在任何扫描开始之前，环境预检阶段负责完成：
+
+- 工具 PATH 检测和可用性验证。
+- 按优先级分层（required / required_verify / high / medium / optional）处理缺失工具。
+- 自动安装缺失工具，安装优先级：`pipx > npm > pip > apt/dnf/brew > manual`，默认安装路径 `~/.local/bin`。
+- 生成 `env_check.json`，记录每个工具的状态和 fallback 决策。
+- 对 `required` 且无 fallback 的工具执行 hard-block，中止扫描并给出安装提示。
+
+详细逻辑见 `phases/phase-preflight.md`。
+
+### Phase 0: 解压与画像
+
 Phase 0 负责解压和画像生成：
 
 - 生成唯一 `scan_id`，格式为 `BBH-YYYYMMDD-<6 hex>`。
@@ -94,6 +108,7 @@ blackbox-hunter-skill/
 ├── SKILL.md                         # Skill 入口和总编排说明
 ├── README.md                        # 中文使用说明
 ├── phases/                          # 分阶段执行手册
+│   ├── phase-preflight.md           # 环境预检（工具检测、安装、PATH 管理）
 │   ├── phase-0-profile.md
 │   ├── phase-1a-toolscan.md
 │   ├── phase-1b-ai-analysis.md
@@ -115,6 +130,7 @@ blackbox-hunter-skill/
 
 ```text
 输入包
+  -> Phase -1 (Preflight): env_check (工具检测、PATH 管理、自动安装)
   -> Phase 0: target_profile / scan_strategy / coverage_plan / scan_state
   -> Phase 1a: track_a_findings
   -> Phase 1b: track_b_findings
@@ -145,6 +161,7 @@ $WORKSPACE/<scan_id>/
 - `merged_findings.json`：去重合并结果。
 - `coverage_report.json`：覆盖率报告。
 - `verified_findings.json`：PoC 验证后的发现。
+- `env_check.json`：环境预检结果，记录工具检测状态、fallback 决策和安装记录。
 
 所有 finding ID 只允许两类前缀：
 
@@ -178,20 +195,34 @@ idle
 - `bash`
 - `python3`
 
-实际扫描会按能力使用以下可选工具：
+实际扫描使用的工具按优先级分为五个层级：
 
-- `cve-bin-tool`
-- `checksec`
-- `cwe_checker`
-- `binwalk`
-- `yara`
-- `lintian`
-- `rpmlint`
-- `radare2`
-- `ghidra`
-- `docker` 或 `podman`
+| 优先级 | 说明 | 缺失行为 |
+|---|---|---|
+| `required` | 核心扫描工具，无 fallback | hard-block：中止扫描，提示用户安装 |
+| `required` (带 fallback) | 核心扫描工具，有替代链 | soft-warn：使用 fallback 工具继续 |
+| `required_verify` | PoC 验证阶段必需 | phase-block：仅阻塞 Phase 3 |
+| `high` / `medium` | 重要但非阻塞 | warn-and-continue：记录警告，继续扫描 |
+| `optional` | 辅助加速工具 | silent-skip：静默跳过 |
 
-工具注册和安装提示见 `tools/tool_registry.json` 与 `tools/install.sh`。缺失可选工具时，流程应记录降级原因，而不是静默产出空结果。
+典型工具包括：
+
+- `cve-bin-tool`（fallback: trivy → grype）
+- `checksec`（fallback: hardening-check）
+- `cwe_checker`（fallback: radare2）
+- `ghidra`（fallback: radare2 → objdump）
+- `docker`（fallback: podman）
+- `binwalk`、`yara`、`lintian`、`rpmlint`、`radare2`
+
+**环境预检阶段**（`phase-preflight.md`）负责所有工具检测、PATH 管理和安装建议，在 Phase 0 之前完成。默认路径以准确率优先：尽可能发现缺失工具，给出安装命令，并在用户确认后执行安装。安装优先级为：
+
+```text
+pipx > npm > pip > apt/dnf/brew > manual
+```
+
+默认安装路径为 `~/.local/bin`。
+
+工具注册和 fallback 链定义见 `tools/tool_registry.json` 与 `tools/install.sh`。缺失工具时，预检阶段会将检测结果写入 `env_check.json`，并在 `scan_state.json.error_log` 中记录降级原因。`install.sh` 支持 `--output <file>` 和 `--scan-root <dir>`；如果都不提供，默认写入当前目录的 `env_check.json` 并打印绝对路径。`--offline` 仅用于受控环境或复现历史扫描：只检测现有工具，不安装、不联网，并在报告中体现覆盖率和置信度降级。
 
 ## 快速验证
 

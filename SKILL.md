@@ -17,6 +17,8 @@ Use this skill when the user wants to scan an rpm or deb package for vulnerabili
 
 ```text
 idle
+  -> preflight_running
+  -> preflight_done
   -> phase_0_running
   -> phase_0_done
   -> track_a_running + track_b_running
@@ -43,12 +45,13 @@ Every phase entry in `scan_state.json.phase_status` has `status`, optional times
 
 ## Orchestration
 
-1. Load `phases/phase-0-profile.md` and produce `target_profile.json`, `scan_strategy.json`, `coverage_plan.json`, `sandbox_status.json`, and `scan_state.json`.
-2. Run Track A from `phases/phase-1a-toolscan.md` for deterministic tooling.
-3. Run Track B from `phases/phase-1b-ai-analysis.md` for prioritized AI binary analysis.
-4. Merge and score with `phases/phase-2-merge.md`.
-5. Verify feasible findings in the sandbox with `phases/phase-3-verify.md`.
-6. Generate the final report with `phases/phase-4-report.md`.
+1. Run environment preflight from `phases/phase-preflight.md` to validate tool availability, install missing dependencies, and produce `env_check.json`. If hard-blocked, abort and present installation instructions to the user.
+2. Load `phases/phase-0-profile.md` and produce `target_profile.json`, `scan_strategy.json`, `coverage_plan.json`, `sandbox_status.json`, and `scan_state.json`.
+3. Run Track A from `phases/phase-1a-toolscan.md` for deterministic tooling.
+4. Run Track B from `phases/phase-1b-ai-analysis.md` for prioritized AI binary analysis.
+5. Merge and score with `phases/phase-2-merge.md`.
+6. Verify feasible findings in the sandbox with `phases/phase-3-verify.md`.
+7. Generate the final report with `phases/phase-4-report.md`.
 
 ## Phase Execution Contract
 
@@ -66,4 +69,4 @@ Every phase entry in `scan_state.json.phase_status` has `status`, optional times
 
 ## Error Escalation
 
-Escalate to the user with concrete options when extraction fails, disk preflight fails, architecture support is missing for all binaries, sandbox startup fails, or schema validation fails after a rerun.
+Escalate to the user with concrete options when environment preflight hard-blocks on missing required tools, extraction fails, disk preflight fails, architecture support is missing for all binaries, sandbox startup fails, or schema validation fails after a rerun.

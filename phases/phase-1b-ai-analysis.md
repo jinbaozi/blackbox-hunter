@@ -5,12 +5,21 @@ Perform structured AI-assisted binary analysis against prioritized functions and
 The phase consumes target_profile.json and scan_strategy.json and emits track_b_findings.json.
 
 ## Required Inputs
+- $SCAN_ROOT/env_check.json
 - $SCAN_ROOT/target_profile.json
 - $SCAN_ROOT/scan_strategy.json
 - $SCAN_ROOT/scan_state.json
 - Extracted package tree under $SCAN_ROOT/extracted
 
 ## Engine Commands
+
+Select the analysis engine from `env_check.json` in this order:
+
+1. Ghidra when `ghidra` is `available`.
+2. radare2 when `radare2` is `available` or selected as a fallback.
+3. objdump/strings fallback when neither decompiler path is available.
+
+If `env_check.json` is missing during resume from an older scan, perform local detection and record the compatibility fallback in `scan_state.json.error_log`.
 
 ### radare2
 ```bash

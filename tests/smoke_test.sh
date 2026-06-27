@@ -41,4 +41,9 @@ EOF
 
 test -d "$SCAN_ROOT/extracted/usr/bin"
 grep -q "$SCAN_ID" "$SCAN_ROOT/scan_strategy.json"
+
+# Preflight phase checks
+test -f "$ROOT/phases/phase-preflight.md" || { echo "FAIL: phases/phase-preflight.md not found"; exit 1; }
+grep -q "env_check.json" "$ROOT/SKILL.md" || { echo "FAIL: SKILL.md does not reference env_check.json"; exit 1; }
+
 echo "smoke OK: $SCAN_ID"

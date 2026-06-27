@@ -1,0 +1,74 @@
+{
+  "checked_at": "2026-06-27T10:00:00Z",
+  "path_patched": true,
+  "path_warnings": [
+    "~/.local/bin was not in PATH; added to current session"
+  ],
+  "extended_dirs_scanned": [
+    "~/.local/bin",
+    "/usr/local/bin",
+    "/usr/bin",
+    "/opt/homebrew/bin",
+    "/snap/bin",
+    "~/.cargo/bin"
+  ],
+  "offline_mode": false,
+  "check_only": true,
+  "registry_path": "/workspace/blackbox-hunter-skill/tools/tool_registry.json",
+  "output_path": "/workspace/BBH-20260627-a1b2c3/env_check.json",
+  "package_type": "deb",
+  "tools": [
+    {
+      "name": "cve-bin-tool",
+      "binary_name": "cve-bin-tool",
+      "priority": "required",
+      "status": "available",
+      "detected_version": "3.2",
+      "required_version": "3.0",
+      "found_in": "/usr/local/bin/cve-bin-tool",
+      "applicable": true
+    },
+    {
+      "name": "checksec",
+      "binary_name": "checksec",
+      "priority": "required",
+      "status": "available",
+      "detected_version": "2.7",
+      "required_version": "2.0",
+      "found_in": "/usr/bin/checksec",
+      "applicable": true
+    },
+    {
+      "name": "ghidra",
+      "binary_name": "analyzeHeadless",
+      "priority": "medium",
+      "status": "fallback_active",
+      "fallback_used": "radare2",
+      "found_in": "/usr/bin/r2",
+      "applicable": true
+    },
+    {
+      "name": "lintian",
+      "binary_name": "lintian",
+      "priority": "high",
+      "status": "skipped_not_applicable",
+      "applicable": false
+    }
+  ],
+  "block_decision": {
+    "blocked": false,
+    "blocked_tools": [],
+    "install_hints": [],
+    "phase_blocks": [
+      {
+        "phase": "phase_3",
+        "tool": "docker",
+        "reason": "verification runtime unavailable"
+      }
+    ],
+    "warnings": [
+      "ghidra using fallback radare2"
+    ]
+  },
+  "confidence_ceiling": 0.93
+}

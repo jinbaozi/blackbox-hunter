@@ -27,6 +27,6 @@ PHASE_COUNT="$(find "$PROJECT_DIR/phases" -name "*.md" | wc -l | tr -d ' ')"
 
 [ "$SCHEMA_COUNT" -ge 10 ] || { echo "FAIL: expected >=10 schemas, found $SCHEMA_COUNT"; ERRORS=$((ERRORS + 1)); }
 [ "$RULE_COUNT" -ge 3 ] || { echo "FAIL: expected >=3 YARA rules, found $RULE_COUNT"; ERRORS=$((ERRORS + 1)); }
-[ "$PHASE_COUNT" -ge 6 ] || { echo "FAIL: expected >=6 phase docs, found $PHASE_COUNT"; ERRORS=$((ERRORS + 1)); }
+[ "$PHASE_COUNT" -ge 7 ] || { echo "FAIL: expected >=7 phase docs, found $PHASE_COUNT"; ERRORS=$((ERRORS + 1)); }
 
 [ "$ERRORS" -eq 0 ]

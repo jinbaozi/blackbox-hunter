@@ -3,6 +3,8 @@
   "tools": [
     {
       "name": "cve-bin-tool",
+      "binary_name": "cve-bin-tool",
+      "install_priority": ["pipx", "pip"],
       "version_min": "3.0",
       "install_cmds": {
         "apt": "pip install cve-bin-tool",
@@ -18,6 +20,8 @@
     },
     {
       "name": "checksec",
+      "binary_name": "checksec",
+      "install_priority": ["apt", "brew", "pip"],
       "version_min": "2.0",
       "install_cmds": {
         "apt": "sudo apt-get install -y checksec",
@@ -33,6 +37,8 @@
     },
     {
       "name": "cwe_checker",
+      "binary_name": "cwe_checker",
+      "install_priority": ["docker"],
       "version_min": "0.7",
       "install_cmds": {
         "docker": "docker pull fkiecad/cwe_checker"
@@ -46,6 +52,8 @@
     },
     {
       "name": "binwalk",
+      "binary_name": "binwalk",
+      "install_priority": ["pipx", "pip", "brew"],
       "version_min": "2.3",
       "install_cmds": {
         "apt": "pip install binwalk",
@@ -61,6 +69,8 @@
     },
     {
       "name": "yara",
+      "binary_name": "yara",
+      "install_priority": ["apt", "brew"],
       "version_min": "4.0",
       "install_cmds": {
         "apt": "sudo apt-get install -y yara",
@@ -75,6 +85,8 @@
     },
     {
       "name": "lintian",
+      "binary_name": "lintian",
+      "install_priority": ["apt"],
       "version_min": "2.0",
       "install_cmds": {
         "apt": "sudo apt-get install -y lintian"
@@ -89,6 +101,8 @@
     },
     {
       "name": "rpmlint",
+      "binary_name": "rpmlint",
+      "install_priority": ["apt", "dnf"],
       "version_min": "2.0",
       "install_cmds": {
         "apt": "sudo apt-get install -y rpmlint",
@@ -104,6 +118,8 @@
     },
     {
       "name": "radare2",
+      "binary_name": "r2",
+      "install_priority": ["apt", "brew"],
       "version_min": "5.0",
       "install_cmds": {
         "apt": "sudo apt-get install -y radare2",
@@ -118,6 +134,8 @@
     },
     {
       "name": "ghidra",
+      "binary_name": "analyzeHeadless",
+      "install_priority": ["snap", "manual"],
       "version_min": "11.0",
       "install_cmds": {
         "snap": "sudo snap install ghidra",
@@ -132,6 +150,8 @@
     },
     {
       "name": "docker",
+      "binary_name": "docker",
+      "install_priority": ["apt", "script"],
       "version_min": "20.0",
       "install_cmds": {
         "apt": "sudo apt-get install -y docker.io",
@@ -146,6 +166,8 @@
     },
     {
       "name": "podman",
+      "binary_name": "podman",
+      "install_priority": ["apt", "brew"],
       "version_min": "4.0",
       "install_cmds": {
         "apt": "sudo apt-get install -y podman",

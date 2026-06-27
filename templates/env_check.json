@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/env_check.json",
+  "title": "Environment Check Report",
+  "type": "object",
+  "required": ["checked_at", "path_patched", "path_warnings", "tools", "block_decision"],
+  "properties": {
+    "checked_at": { "type": "string", "format": "date-time" },
+    "path_patched": { "type": "boolean", "description": "Whether PATH was modified during preflight" },
+    "path_warnings": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Warnings about PATH configuration"
+    },
+    "extended_dirs_scanned": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Extended directories that were scanned for tools"
+    },
+    "offline_mode": { "type": "boolean", "description": "Whether offline mode was active" },
+    "check_only": { "type": "boolean", "description": "Whether install actions were disabled by check-only mode" },
+    "registry_path": { "type": "string", "description": "Registry file used for this preflight run" },
+    "output_path": { "type": "string", "description": "Absolute env_check.json output path" },
+    "package_type": { "type": "string", "enum": ["", "deb", "rpm"], "description": "Target package type filter used for applies_to decisions" },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "priority", "status"],
+        "properties": {
+          "name": { "type": "string" },
+          "binary_name": { "type": "string", "description": "Actual binary name if different from package name" },
+          "priority": { "type": "string", "enum": ["required", "required_verify", "high", "medium", "optional"] },
+          "status": {
+            "type": "string",
+            "enum": ["available", "missing", "version_low", "install_failed", "fallback_active", "skipped_not_applicable"]
+          },
+          "detected_version": { "type": "string" },
+          "required_version": { "type": "string" },
+          "found_in": { "type": "string", "description": "Filesystem path where the tool was found" },
+          "install_method": { "type": "string", "description": "Method used to install (pipx, npm, pip, apt, dnf, brew, snap, docker, manual, script)" },
+          "fallback_used": { "type": "string", "description": "Name of fallback tool being used" },
+          "error_message": { "type": "string" },
+          "applicable": { "type": "boolean", "description": "Whether this tool is applicable to the current scan" }
+        }
+      }
+    },
+    "block_decision": {
+      "type": "object",
+      "required": ["blocked"],
+      "properties": {
+        "blocked": { "type": "boolean" },
+        "reason": { "type": "string" },
+        "blocked_tools": { "type": "array", "items": { "type": "string" } },
+        "install_hints": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Human-readable installation hints for blocked tools"
+        },
+        "phase_blocks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["phase", "tool", "reason"],
+            "properties": {
+              "phase": { "type": "string" },
+              "tool": { "type": "string" },
+              "reason": { "type": "string" }
+            }
+          },
+          "description": "Phase-specific blocks that do not stop the full scan"
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Non-blocking preflight warnings and degradation notes"
+        }
+      }
+    },
+    "confidence_ceiling": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Suggested maximum confidence ceiling based on available tools"
+    }
+  }
+}
