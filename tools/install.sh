@@ -218,6 +218,17 @@ def confirm_install(tool_name, method, command):
     return False, "install skipped: user declined"
 
 
+def confirm_fallback(tool_name, fallback_name):
+    if not sys.stdin.isatty():
+        return False, "non-interactive stdin: fallback not auto-activated"
+    print(f"\nTool '{tool_name}' could not be installed/verified.")
+    print(f"Fallback '{fallback_name}' is available but may produce lower-confidence results.")
+    answer = input(f"Use fallback '{fallback_name}' instead? [y/N] ").strip().lower()
+    if answer in {"y", "yes"}:
+        return True, ""
+    return False, "user declined fallback"
+
+
 def maybe_install(tool, args):
     if args.check_only:
         return False, "", "check-only mode: install skipped"
@@ -379,11 +390,20 @@ def make_tool_record(tool, args, platform, tools_by_name, path_state):
         for fallback in tool.get("fallbacks") or []:
             ok, found_in, binary_name = detect_fallback(fallback, tools_by_name, path_state)
             if ok:
-                record["status"] = "fallback_active"
-                record["fallback_used"] = fallback
-                record["found_in"] = found_in
-                record["error_message"] = f"primary unavailable; using fallback {fallback} ({binary_name})"
-                break
+                if args.auto_fix:
+                    allowed = True
+                else:
+                    allowed, reason = confirm_fallback(tool["name"], fallback)
+                if allowed:
+                    record["status"] = "fallback_active"
+                    record["fallback_used"] = fallback
+                    record["found_in"] = found_in
+                    record["error_message"] = f"primary unavailable; using fallback {fallback} ({binary_name})"
+                    break
+                else:
+                    suffix = f"; fallback {fallback} declined ({reason})"
+                    record["error_message"] = (record.get("error_message") or "") + suffix
+                    break
     return record
 
 

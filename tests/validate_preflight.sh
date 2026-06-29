@@ -71,6 +71,7 @@ HOME="$TMPDIR/home" PATH="$TMPDIR/fakebin:/usr/bin:/bin" \
   bash "$ROOT/tools/install.sh" \
     --check-only \
     --offline \
+    --auto-fix \
     --package-type deb \
     --registry "$TMPDIR/registry-ok.json" \
     --scan-root "$TMPDIR/scan"
