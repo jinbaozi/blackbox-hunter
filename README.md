@@ -18,6 +18,40 @@ BlackBox Hunter 是一个面向 `.deb` / `.rpm` 软件包的黑盒漏洞分析 S
 - 需要动态联网攻击、真实外部服务探测或横向移动验证的任务。
 - 不能接受 AI 推断参与漏洞研判的合规流程。Track B 输出需要结合证据和置信度使用。
 
+## 扫描维度和具体方式
+
+BlackBox Hunter 的扫描不是单一工具输出，而是按“包画像、确定性工具扫描、AI 二进制分析、合并评分、沙箱验证”分层推进。各维度的覆盖范围和执行方式如下。
+
+| 扫描维度 | 关注目标 | 具体方式 | 主要证据或产物 |
+|---|---|---|---|
+| 包结构与攻击面画像 | 确认包类型、架构、入口点和可被攻击者触达的文件 | 解压 `.deb` / `.rpm`，遍历 ELF、脚本、配置文件、systemd 单元、setuid/setgid 文件、命令行入口、潜在网络监听点，并按架构决定后续工具链 | `target_profile.json`、`scan_strategy.json`、`coverage_plan.json` |
+| 依赖与 CVE 线索 | 发现已知漏洞组件、共享库和包依赖风险 | 使用 `cve-bin-tool` 扫描包和二进制组件；不可用时按预检结果降级到 `trivy` 或 `grype`；离线 CVE 缓存超过 14 天时降低 CVE 发现置信度 | CVE ID、组件名、版本、数据库新鲜度、工具原始输出 |
+| ELF 加固能力 | 判断二进制是否缺失常见安全缓解 | 使用 `checksec` 检查 NX、PIE、RELRO、Canary 等 hardening 标志；不可用时尝试 `hardening-check` fallback | hardening 标志、受影响 ELF 路径、置信度降级原因 |
+| 二进制 CWE 模式 | 识别常见内存安全和二进制缺陷模式 | 使用 `cwe_checker` 对支持架构做静态模式分析；架构或工具不支持时降级到 `radare2`、`objdump`、`readelf`、`strings` 证据 | CWE 编号、函数或地址偏移、架构支持状态 |
+| 危险函数与系统调用 | 发现不安全 libc/API、命令执行、临时文件、弱随机等高风险用法 | 使用 `strings`、导入表、YARA 规则和反汇编证据定位 `strcpy`、`sprintf`、`system`、`popen`、`mktemp`、`rand` 等调用，再由 Track B 做上下文确认 | YARA 命中、导入符号、函数名、地址、调用上下文 |
+| 输入验证与边界检查 | 检查外部输入进入解析、长度计算、拷贝、分配前是否有边界约束 | 优先分析网络入口、文件/协议解析器、CLI 参数处理和配置加载函数；使用 Ghidra、radare2 或 objdump 追踪输入到危险操作的数据流 | 反编译片段、反汇编片段、xrefs、输入路径、缺失 guard |
+| 控制流异常 | 发现可疑间接调用、computed jump、分发表、异常错误恢复路径 | Track B 对高优先级函数检查分支复杂度、间接跳转、函数指针调用和错误处理路径；结合 xref 和调用图判断是否可被输入影响 | 函数地址、调用图、跳转目标、可控条件说明 |
+| 内存管理 | 检查越界读写、整数溢出后分配、use-after-free、double free 等风险 | 结合 `cwe_checker`、反编译输出、调用关系和危险内存 API，重点看长度字段、循环边界、分配大小、释放后访问 | CWE-119/CWE-120/CWE-125/CWE-190 等映射、函数片段、地址偏移 |
+| 权限模型 | 检查 root 服务、setuid/setgid、Linux capability、特权文件操作和权限边界 | Phase 0 收集特权文件和服务用户；Track B 分析敏感操作是否受低权限输入影响；Track A 检查包脚本和服务配置 | setuid/setgid 清单、systemd `User=`、敏感路径、权限前置条件 |
+| 协议和文件格式解析 | 检查协议字段、文件格式长度、归档路径和解析状态机 | 对 parser loop、请求处理函数、文件导入路径做优先级排序；分析长度字段、路径拼接、状态转换和错误恢复 | 解析函数、输入格式、长度字段、路径处理证据 |
+| 硬编码配置与密钥 | 发现默认凭据、API token、私钥、证书、调试配置和危险默认值 | 使用 `strings` 和 YARA 规则扫描 credential 上下文、高熵字符串、私钥头、AWS key、debug/log level、`0.0.0.0` 绑定等模式；Track B 对可利用性做确认 | YARA 命中、字符串上下文、文件路径、配置键值 |
+| 包元数据与维护脚本 | 检查安装/卸载脚本、包元数据、服务启动配置中的风险 | `.deb` 使用 `lintian`，`.rpm` 使用 `rpmlint`；同时人工/AI 关注 maintainer script、postinst、systemd unit、权限变更和 shell 执行 | lint 输出、脚本路径、配置片段、风险说明 |
+| 嵌入内容与文件异常 | 发现包内嵌套固件、压缩内容、异常文件类型或隐藏载荷 | 使用文件遍历和 `binwalk` 做嵌入内容识别；对提取失败或不支持格式记录覆盖率限制 | 嵌入文件线索、文件类型、提取状态、覆盖率备注 |
+| 去重、评分与覆盖率 | 合并多工具结果，避免重复报告并体现证据强弱 | Phase 2 按二进制、CVE/CWE、函数、地址偏移、等价标题去重；按证据强度、跨 Track 一致性、架构 fallback、CVE 数据库状态调整置信度 | `merged_findings.json`、`coverage_report.json`、`dedup_info.merged_from` |
+| PoC 沙箱验证 | 对高价值发现做受控复现，区分“线索”和“已验证” | Phase 3 在 Docker/Podman 沙箱中运行 PoC；默认无网络、非特权用户、seccomp 限制、只读挂载目标包，采集退出码、stdout/stderr 和产物 | `verified_findings.json`、PoC 日志、`verification.poc_status` |
+
+Track B 的 AI 二进制分析会按扫描模式控制深度：`quick` 只覆盖危险函数和硬编码配置；`standard` 覆盖五个最高价值维度；`deep` 覆盖七个核心维度；`full` 分析所有可达函数并做交叉验证。七个核心维度是：
+
+- `dangerous_functions`：危险函数调用和不安全系统调用。
+- `input_validation`：输入验证、边界检查、长度字段和分配大小。
+- `control_flow`：异常控制流、间接调用、computed jump 和状态转换。
+- `memory_management`：内存生命周期、越界访问、释放错误和整数溢出。
+- `privilege_model`：权限边界、setuid/setgid、root 服务和敏感操作。
+- `protocol_parsing`：协议解析、文件格式解析、路径和长度处理。
+- `hardcoded_config`：硬编码凭据、默认密钥、调试配置和危险默认值。
+
+所有维度都要求保留可审计证据。Track A 主要输出工具证据，Track B 必须绑定函数、地址、反编译/反汇编片段、字符串、配置或原始工具输出；证据不足时只能记录低置信度线索或不产生 finding。
+
 ## 核心能力
 
 ### 1. 软件包画像
