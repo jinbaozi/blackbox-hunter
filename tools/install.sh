@@ -70,7 +70,7 @@ def output_path(args):
     if args.output:
         return Path(args.output).expanduser().resolve()
     if args.scan_root:
-        return (Path(args.scan_root).expanduser().resolve() / "env_check.json")
+        return Path(args.scan_root).expanduser().resolve() / "env_check.json"
     return (Path.cwd() / "env_check.json").resolve()
 
 
@@ -113,6 +113,8 @@ def ensure_local_bin(path_warnings):
 
 
 def command_exists(binary):
+    if not binary:
+        return None
     found = shutil.which(binary)
     if found:
         return Path(found).resolve()
@@ -120,6 +122,8 @@ def command_exists(binary):
 
 
 def scan_extended_dirs(binary):
+    if not binary:
+        return None, False
     for item in EXTENDED_DIRS:
         directory = Path(item).expanduser()
         candidate = directory / binary
@@ -132,6 +136,15 @@ def scan_extended_dirs(binary):
                 patched = True
             return candidate.resolve(), patched
     return None, False
+
+
+def find_binary(binary, path_state):
+    found = command_exists(binary)
+    if not found:
+        found, patched = scan_extended_dirs(binary)
+        if patched:
+            path_state["path_patched"] = True
+    return found
 
 
 def run_command(command, timeout=20):
@@ -273,13 +286,44 @@ def is_applicable(tool, package_type, platform):
     return True, ""
 
 
-def detect_tool(tool, path_state):
+def detect_container_image_tool(tool, path_state):
+    engine = tool.get("container_engine") or "docker"
+    engine_found = find_binary(engine, path_state)
+    if not engine_found:
+        return {
+            "available": False,
+            "found_in": "",
+            "detected_version": "",
+            "error_message": f"container engine not found: {engine}",
+        }
+
+    image = tool.get("container_image") or tool.get("image") or tool["name"]
+    detect_cmd = tool.get("detect_cmd")
+    if not detect_cmd:
+        detect_cmd = f"{shlex.quote(engine)} image inspect {shlex.quote(image)}"
+
+    result = run_command(detect_cmd, timeout=60)
+    output = (result.stdout or "") + "\n" + (result.stderr or "")
+    if result.returncode == 0:
+        return {
+            "available": True,
+            "found_in": str(engine_found),
+            "detected_version": extract_version(output),
+            "error_message": "",
+        }
+
+    message = (result.stderr or result.stdout or "").strip()
+    return {
+        "available": False,
+        "found_in": str(engine_found),
+        "detected_version": "",
+        "error_message": message or f"container image unavailable or detect command exited {result.returncode}: {image}",
+    }
+
+
+def detect_host_binary_tool(tool, path_state):
     binary = tool.get("binary_name") or tool["name"]
-    found = command_exists(binary)
-    if not found:
-        found, patched = scan_extended_dirs(binary)
-        if patched:
-            path_state["path_patched"] = True
+    found = find_binary(binary, path_state)
     if not found:
         return {
             "available": False,
@@ -304,29 +348,39 @@ def detect_tool(tool, path_state):
     }
 
 
+def detect_tool(tool, path_state):
+    execution_model = tool.get("execution_model") or "host_binary"
+    if execution_model == "container_image":
+        return detect_container_image_tool(tool, path_state)
+    return detect_host_binary_tool(tool, path_state)
+
+
 def detect_fallback(fallback, tools_by_name, path_state):
     fallback_tool = tools_by_name.get(fallback)
     if fallback_tool:
         result = detect_tool(fallback_tool, path_state)
-        return result["available"], result.get("found_in", ""), fallback_tool.get("binary_name") or fallback
-    found = command_exists(fallback)
-    if not found:
-        found, patched = scan_extended_dirs(fallback)
-        if patched:
-            path_state["path_patched"] = True
+        binary_name = fallback_tool.get("binary_name") or fallback_tool.get("container_image") or fallback
+        return result["available"], result.get("found_in", ""), binary_name
+    found = find_binary(fallback, path_state)
     return bool(found), str(found) if found else "", fallback
 
 
 def make_tool_record(tool, args, platform, tools_by_name, path_state):
     priority = tool.get("priority", "optional")
     binary = tool.get("binary_name") or tool["name"]
+    execution_model = tool.get("execution_model") or "host_binary"
     record = {
         "name": tool["name"],
         "binary_name": binary,
+        "execution_model": execution_model,
         "priority": priority,
         "status": "missing",
         "applicable": True,
     }
+    if tool.get("container_image"):
+        record["container_image"] = tool["container_image"]
+    if tool.get("container_engine"):
+        record["container_engine"] = tool["container_engine"]
 
     applicable, reason = is_applicable(tool, args.package_type, platform)
     if not applicable:
@@ -385,6 +439,8 @@ def make_tool_record(tool, args, platform, tools_by_name, path_state):
         else:
             record["status"] = "missing"
             record["error_message"] = error or detection["error_message"]
+            if detection.get("found_in"):
+                record["found_in"] = detection["found_in"]
 
     if record["status"] in {"missing", "version_low", "install_failed"}:
         for fallback in tool.get("fallbacks") or []:
@@ -392,6 +448,7 @@ def make_tool_record(tool, args, platform, tools_by_name, path_state):
             if ok:
                 if args.auto_fix:
                     allowed = True
+                    reason = ""
                 else:
                     allowed, reason = confirm_fallback(tool["name"], fallback)
                 if allowed:
@@ -400,10 +457,9 @@ def make_tool_record(tool, args, platform, tools_by_name, path_state):
                     record["found_in"] = found_in
                     record["error_message"] = f"primary unavailable; using fallback {fallback} ({binary_name})"
                     break
-                else:
-                    suffix = f"; fallback {fallback} declined ({reason})"
-                    record["error_message"] = (record.get("error_message") or "") + suffix
-                    break
+                suffix = f"; fallback {fallback} declined ({reason})"
+                record["error_message"] = (record.get("error_message") or "") + suffix
+                break
     return record
 
 

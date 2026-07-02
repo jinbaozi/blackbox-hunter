@@ -6,6 +6,16 @@ SCHEMAS_DIR="$SCRIPT_DIR/../templates"
 FIXTURES_DIR="$SCRIPT_DIR/fixtures"
 ERRORS=0
 
+if ! python3 - <<'PYIN' >/dev/null 2>&1
+import importlib.util, sys
+sys.exit(0 if importlib.util.find_spec("jsonschema") else 1)
+PYIN
+then
+  echo "FAIL: python package 'jsonschema' is required for schema validation."
+  echo "Install it with: python3 -m pip install --user jsonschema"
+  exit 1
+fi
+
 validate_json() {
   local file="$1"
   python3 - "$file" <<'PYIN'
@@ -30,28 +40,41 @@ PYIN
 validate_fixture_with_schema() {
   local fixture="$1"
   local schema="$2"
-  if python3 - <<'PYIN' >/dev/null 2>&1
-import importlib.util, sys
-sys.exit(0 if importlib.util.find_spec("jsonschema") else 1)
-PYIN
-  then
-    python3 - "$fixture" "$schema" <<'PYIN'
+  python3 - "$fixture" "$schema" <<'PYIN'
 import json, sys
 from pathlib import Path
-from jsonschema import Draft202012Validator, RefResolver
+from jsonschema import Draft202012Validator
+try:
+    from referencing import Registry, Resource
+except Exception:
+    Registry = None
+    Resource = None
 
 fixture_path = Path(sys.argv[1]).resolve()
 schema_path = Path(sys.argv[2]).resolve()
+schemas_dir = schema_path.parent
+
 with fixture_path.open(encoding="utf-8") as fh:
     fixture = json.load(fh)
 with schema_path.open(encoding="utf-8") as fh:
     schema = json.load(fh)
-resolver = RefResolver(base_uri=schema_path.as_uri(), referrer=schema)
-Draft202012Validator(schema, resolver=resolver).validate(fixture)
+
+if Registry is not None:
+    resources = []
+    for candidate in schemas_dir.glob("*.json"):
+        with candidate.open(encoding="utf-8") as fh:
+            loaded = json.load(fh)
+        schema_id = loaded.get("$id")
+        if schema_id:
+            resources.append((schema_id, Resource.from_contents(loaded)))
+        resources.append((candidate.as_uri(), Resource.from_contents(loaded)))
+    registry = Registry().with_resources(resources)
+    Draft202012Validator(schema, registry=registry).validate(fixture)
+else:
+    from jsonschema import RefResolver
+    resolver = RefResolver(base_uri=schema_path.as_uri(), referrer=schema)
+    Draft202012Validator(schema, resolver=resolver).validate(fixture)
 PYIN
-  else
-    validate_json "$fixture"
-  fi
 }
 
 schema_for_fixture() {

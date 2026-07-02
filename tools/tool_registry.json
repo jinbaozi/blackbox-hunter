@@ -4,7 +4,11 @@
     {
       "name": "cve-bin-tool",
       "binary_name": "cve-bin-tool",
-      "install_priority": ["pipx", "pip"],
+      "execution_model": "host_binary",
+      "install_priority": [
+        "pipx",
+        "pip"
+      ],
       "version_min": "3.0",
       "install_cmds": {
         "apt": "pip install cve-bin-tool",
@@ -15,14 +19,25 @@
       "upstream_url": "https://github.com/intel/cve-bin-tool",
       "category": "cve_scan",
       "priority": "required",
-      "fallbacks": ["trivy", "grype"],
-      "platform": ["linux", "darwin"],
+      "fallbacks": [
+        "trivy",
+        "grype"
+      ],
+      "platform": [
+        "linux",
+        "darwin"
+      ],
       "needs_network": true
     },
     {
       "name": "checksec",
       "binary_name": "checksec",
-      "install_priority": ["apt", "brew", "pip"],
+      "execution_model": "host_binary",
+      "install_priority": [
+        "apt",
+        "brew",
+        "pip"
+      ],
       "version_min": "2.0",
       "install_cmds": {
         "apt": "sudo apt-get install -y checksec",
@@ -33,30 +48,49 @@
       "upstream_url": "https://github.com/slimm609/checksec",
       "category": "hardening",
       "priority": "required",
-      "fallbacks": ["hardening-check"],
-      "platform": ["linux", "darwin"],
+      "fallbacks": [
+        "hardening-check"
+      ],
+      "platform": [
+        "linux",
+        "darwin"
+      ],
       "needs_network": false
     },
     {
       "name": "cwe_checker",
       "binary_name": "cwe_checker",
-      "install_priority": ["docker"],
+      "execution_model": "container_image",
+      "container_engine": "docker",
+      "container_image": "fkiecad/cwe_checker",
+      "install_priority": [
+        "docker"
+      ],
       "version_min": "0.7",
       "install_cmds": {
         "docker": "docker pull fkiecad/cwe_checker"
       },
-      "detect_cmd": "docker run --rm fkiecad/cwe_checker --version",
+      "detect_cmd": "docker run --rm --pull=never fkiecad/cwe_checker --version",
       "upstream_url": "https://github.com/fkie-cad/cwe_checker",
       "category": "binary_defect",
       "priority": "high",
-      "fallbacks": ["radare2"],
-      "platform": ["linux"],
+      "fallbacks": [
+        "radare2"
+      ],
+      "platform": [
+        "linux"
+      ],
       "needs_network": true
     },
     {
       "name": "binwalk",
       "binary_name": "binwalk",
-      "install_priority": ["pipx", "pip", "brew"],
+      "execution_model": "host_binary",
+      "install_priority": [
+        "pipx",
+        "pip",
+        "brew"
+      ],
       "version_min": "2.3",
       "install_cmds": {
         "apt": "pip install binwalk",
@@ -68,13 +102,20 @@
       "category": "file_analysis",
       "priority": "medium",
       "fallbacks": [],
-      "platform": ["linux", "darwin"],
+      "platform": [
+        "linux",
+        "darwin"
+      ],
       "needs_network": true
     },
     {
       "name": "yara",
       "binary_name": "yara",
-      "install_priority": ["apt", "brew"],
+      "execution_model": "host_binary",
+      "install_priority": [
+        "apt",
+        "brew"
+      ],
       "version_min": "4.0",
       "install_cmds": {
         "apt": "sudo apt-get install -y yara",
@@ -85,13 +126,19 @@
       "category": "pattern_scan",
       "priority": "high",
       "fallbacks": [],
-      "platform": ["linux", "darwin"],
+      "platform": [
+        "linux",
+        "darwin"
+      ],
       "needs_network": false
     },
     {
       "name": "lintian",
       "binary_name": "lintian",
-      "install_priority": ["apt"],
+      "execution_model": "host_binary",
+      "install_priority": [
+        "apt"
+      ],
       "version_min": "2.0",
       "install_cmds": {
         "apt": "sudo apt-get install -y lintian"
@@ -101,14 +148,20 @@
       "category": "config_audit",
       "priority": "high",
       "fallbacks": [],
-      "platform": ["linux"],
+      "platform": [
+        "linux"
+      ],
       "applies_to": "deb",
       "needs_network": false
     },
     {
       "name": "rpmlint",
       "binary_name": "rpmlint",
-      "install_priority": ["apt", "dnf"],
+      "execution_model": "host_binary",
+      "install_priority": [
+        "apt",
+        "dnf"
+      ],
       "version_min": "2.0",
       "install_cmds": {
         "apt": "sudo apt-get install -y rpmlint",
@@ -119,14 +172,20 @@
       "category": "config_audit",
       "priority": "high",
       "fallbacks": [],
-      "platform": ["linux"],
+      "platform": [
+        "linux"
+      ],
       "applies_to": "rpm",
       "needs_network": false
     },
     {
       "name": "radare2",
       "binary_name": "r2",
-      "install_priority": ["apt", "brew"],
+      "execution_model": "host_binary",
+      "install_priority": [
+        "apt",
+        "brew"
+      ],
       "version_min": "5.0",
       "install_cmds": {
         "apt": "sudo apt-get install -y radare2",
@@ -136,14 +195,23 @@
       "upstream_url": "https://github.com/radareorg/radare2",
       "category": "disassembly",
       "priority": "high",
-      "fallbacks": ["objdump"],
-      "platform": ["linux", "darwin"],
+      "fallbacks": [
+        "objdump"
+      ],
+      "platform": [
+        "linux",
+        "darwin"
+      ],
       "needs_network": false
     },
     {
       "name": "ghidra",
       "binary_name": "analyzeHeadless",
-      "install_priority": ["snap", "manual"],
+      "execution_model": "host_binary",
+      "install_priority": [
+        "snap",
+        "manual"
+      ],
       "version_min": "11.0",
       "install_cmds": {
         "snap": "sudo snap install ghidra",
@@ -153,14 +221,24 @@
       "upstream_url": "https://github.com/NationalSecurityAgency/ghidra",
       "category": "disassembly",
       "priority": "medium",
-      "fallbacks": ["radare2", "objdump"],
-      "platform": ["linux", "darwin"],
+      "fallbacks": [
+        "radare2",
+        "objdump"
+      ],
+      "platform": [
+        "linux",
+        "darwin"
+      ],
       "needs_network": true
     },
     {
       "name": "docker",
       "binary_name": "docker",
-      "install_priority": ["apt", "script"],
+      "execution_model": "host_binary",
+      "install_priority": [
+        "apt",
+        "script"
+      ],
       "version_min": "20.0",
       "install_cmds": {
         "apt": "sudo apt-get install -y docker.io",
@@ -171,14 +249,22 @@
       "upstream_url": "https://github.com/moby/moby",
       "category": "sandbox",
       "priority": "required_verify",
-      "fallbacks": ["podman"],
-      "platform": ["linux"],
+      "fallbacks": [
+        "podman"
+      ],
+      "platform": [
+        "linux"
+      ],
       "needs_network": true
     },
     {
       "name": "podman",
       "binary_name": "podman",
-      "install_priority": ["apt", "brew"],
+      "execution_model": "host_binary",
+      "install_priority": [
+        "apt",
+        "brew"
+      ],
       "version_min": "4.0",
       "install_cmds": {
         "apt": "sudo apt-get install -y podman",
@@ -190,7 +276,9 @@
       "category": "sandbox",
       "priority": "optional",
       "fallbacks": [],
-      "platform": ["linux"],
+      "platform": [
+        "linux"
+      ],
       "needs_network": false
     }
   ]
