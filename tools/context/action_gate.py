@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 HIGH_IMPACT = {"critical", "high"}
-INSTALL_ACTIONS = {"install_tool", "pull_image", "package_manager"}
+INSTALL_ACTIONS = {"install_tool", "pull_image", "build_image", "package_manager"}
 
 
 @dataclass
