@@ -8,6 +8,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+MAX_OUTPUT_READ_BYTES = 1024 * 1024
+
 
 @dataclass
 class ExpectedSignal:
@@ -60,18 +62,22 @@ class VerificationDecision:
     evidence_paths: list[str] = field(default_factory=list)
     crash_signal: str | None = None
     timeout: bool = False
+    truncated_output: bool = False
 
     def to_json(self) -> dict[str, Any]:
         return asdict(self)
 
 
-def _path_text(path_value: str | None) -> str:
+def _path_text(path_value: str | None, limit: int = MAX_OUTPUT_READ_BYTES) -> tuple[str, bool]:
     if not path_value:
-        return ""
+        return "", False
     path = Path(path_value)
     if not path.exists() or not path.is_file():
-        return ""
-    return path.read_text(encoding="utf-8", errors="replace")
+        return "", False
+    with path.open("rb") as fh:
+        data = fh.read(limit + 1)
+    truncated = len(data) > limit
+    return data[:limit].decode("utf-8", errors="replace"), truncated
 
 
 def _evidence_paths(runner: RunnerResult) -> list[str]:
@@ -79,34 +85,63 @@ def _evidence_paths(runner: RunnerResult) -> list[str]:
     return [str(item) for item in paths if item]
 
 
-def _combined_output(runner: RunnerResult) -> str:
-    return _path_text(runner.stdout_path) + "\n" + _path_text(runner.stderr_path)
+def _combined_output(runner: RunnerResult) -> tuple[str, bool]:
+    stdout, out_truncated = _path_text(runner.stdout_path)
+    stderr, err_truncated = _path_text(runner.stderr_path)
+    return stdout + "\n" + stderr, out_truncated or err_truncated
+
+
+def _decision(
+    poc_status: str,
+    finding_status: str,
+    reason: str,
+    runner: RunnerResult,
+    evidence: list[str],
+    *,
+    crash_signal: str | None = None,
+    truncated_output: bool = False,
+) -> VerificationDecision:
+    if truncated_output:
+        reason = reason + "; stdout/stderr were read with bounded truncation"
+    return VerificationDecision(
+        poc_status,
+        finding_status,
+        reason,
+        evidence,
+        crash_signal=crash_signal,
+        timeout=runner.timeout,
+        truncated_output=truncated_output,
+    )
 
 
 def interpret_result(expected: ExpectedSignal, runner: RunnerResult) -> VerificationDecision:
     evidence = _evidence_paths(runner)
     status = runner.status
     if status == "sandbox_error":
-        return VerificationDecision("sandbox_error", "confirmed_static", runner.failure_reason or "sandbox infrastructure failed", evidence, timeout=runner.timeout)
+        return _decision("sandbox_error", "confirmed_static", runner.failure_reason or "sandbox infrastructure failed", runner, evidence)
     if status == "poc_error":
-        return VerificationDecision("poc_error", "confirmed_static", runner.failure_reason or "PoC artifact failed before exercising target", evidence, timeout=runner.timeout)
+        return _decision("poc_error", "confirmed_static", runner.failure_reason or "PoC artifact failed before exercising target", runner, evidence)
     if runner.timeout:
         if expected.type == "timeout":
-            return VerificationDecision("verified", "verified", "expected timeout/hang signal observed", evidence, timeout=True)
-        return VerificationDecision("inconclusive", "confirmed_static", "PoC timed out before expected signal was confirmed", evidence, timeout=True)
+            return _decision("verified", "verified", "expected timeout/hang signal observed", runner, evidence)
+        return _decision("inconclusive", "confirmed_static", "PoC timed out before expected signal was confirmed", runner, evidence)
     if expected.type == "crash" and (status == "crash" or runner.exit_code > 128):
         if expected.crash_signal and runner.crash_signal and expected.crash_signal != runner.crash_signal:
-            return VerificationDecision("inconclusive", "confirmed_static", "crash observed but signal did not match expected signal", evidence, runner.crash_signal, False)
-        return VerificationDecision("verified", "verified", "expected crash signal observed", evidence, runner.crash_signal, False)
+            return _decision("inconclusive", "confirmed_static", "crash observed but signal did not match expected signal", runner, evidence, crash_signal=runner.crash_signal)
+        return _decision("verified", "verified", "expected crash signal observed", runner, evidence, crash_signal=runner.crash_signal)
     if expected.type == "exit_code" and expected.exit_code is not None and runner.exit_code == expected.exit_code:
-        return VerificationDecision("verified", "verified", f"expected exit code observed: {runner.exit_code}", evidence, timeout=False)
-    if expected.type == "pattern" and expected.pattern and expected.pattern in _combined_output(runner):
-        return VerificationDecision("verified", "verified", "expected output pattern observed", evidence, timeout=False)
+        return _decision("verified", "verified", f"expected exit code observed: {runner.exit_code}", runner, evidence)
+    if expected.type == "pattern" and expected.pattern:
+        combined, truncated = _combined_output(runner)
+        if expected.pattern in combined:
+            return _decision("verified", "verified", "expected output pattern observed", runner, evidence, truncated_output=truncated)
+        if truncated:
+            return _decision("inconclusive", "confirmed_static", "expected pattern absent from bounded output excerpt", runner, evidence, truncated_output=True)
     if status == "completed":
-        return VerificationDecision("failed", "confirmed_static", "PoC completed but expected verification signal was absent", evidence, timeout=False)
+        return _decision("failed", "confirmed_static", "PoC completed but expected verification signal was absent", runner, evidence)
     if status in {"failed", "crash"}:
-        return VerificationDecision("inconclusive", "confirmed_static", "runner result did not prove or disprove the finding", evidence, runner.crash_signal, False)
-    return VerificationDecision("inconclusive", "confirmed_static", f"unrecognized runner status: {status}", evidence, timeout=runner.timeout)
+        return _decision("inconclusive", "confirmed_static", "runner result did not prove or disprove the finding", runner, evidence, crash_signal=runner.crash_signal)
+    return _decision("inconclusive", "confirmed_static", f"unrecognized runner status: {status}", runner, evidence)
 
 
 def interpret_payload(payload: dict[str, Any]) -> dict[str, Any]:
