@@ -1,0 +1,14 @@
+{
+  "expected_signal": {
+    "type": "pattern",
+    "pattern": "VERIFY_SIGNAL"
+  },
+  "runner_result": {
+    "status": "poc_error",
+    "exit_code": 1,
+    "timeout": false,
+    "stdout_path": "",
+    "stderr_path": "",
+    "failure_reason": "PoC script missing"
+  }
+}

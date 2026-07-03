@@ -1,0 +1,12 @@
+{
+  "expected_signal": {
+    "type": "timeout"
+  },
+  "runner_result": {
+    "status": "timeout",
+    "exit_code": 124,
+    "timeout": true,
+    "stdout_path": "",
+    "stderr_path": ""
+  }
+}

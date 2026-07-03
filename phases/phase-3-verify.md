@@ -34,6 +34,21 @@ Construct a PoC only when all of the following are true:
 
 Do not construct a runtime PoC for purely static findings such as hardening gaps, stale CVE matches, or hardcoded strings unless there is a safe local runtime signal to validate.
 
+## Action Gate
+
+Before executing a PoC or setup command, build an action request and evaluate it with `tools/context/action_gate.py`.
+
+The gate must block:
+
+- PoC execution outside the configured sandbox.
+- PoC execution that requires network access.
+- Privileged execution or additional Linux capabilities.
+- Writes outside the configured results directory.
+- High or critical PoC execution without explicit user approval.
+- Package-manager installs or image pulls without explicit user approval.
+
+A blocked action must be recorded in `scan_state.json.error_log` and the affected finding should be marked `skipped`, `poc_error`, or `sandbox_error` depending on the failure type.
+
 ## Verification Flow
 
 Before selecting findings, read `env_check.json.block_decision.phase_blocks`. If Phase 3 is blocked because Docker/Podman or another sandbox runtime is unavailable, mark Phase 3 as `skipped`, write the reason to `scan_state.json.error_log`, and continue to Phase 4 with unverified findings clearly labeled.
@@ -41,23 +56,26 @@ Before selecting findings, read `env_check.json.block_decision.phase_blocks`. If
 1. Select findings with enough reproduction detail and acceptable risk.
 2. Create one PoC testcase from `templates/poc_testcase.md` per eligible finding.
 3. Create `$SCAN_ROOT/poc_results/<finding_id>/` and bind it as `/workspace/results`.
-4. Mount the extracted package read-only.
-5. Execute the testcase with bounded CPU, memory, process count, and timeout.
-6. Record stdout, stderr, exit code, timeout status, runner status, crash signals, monitor telemetry, pre/post state, and evidence paths.
-7. Map the raw runner result into the finding verification state.
+4. Evaluate the planned execution with `tools/context/action_gate.py`.
+5. Mount the extracted package read-only.
+6. Execute the testcase with bounded CPU, memory, process count, and timeout.
+7. Record stdout, stderr, exit code, timeout status, runner status, crash signals, monitor telemetry, pre/post state, and evidence paths.
+8. Interpret the raw runner result with `sandbox/result_interpreter.py` and the expected verification signal before setting `verification.poc_status`.
 
 ## Result Mapping
 
-Use these `verification.poc_status` values:
+Use `sandbox/result_interpreter.py` to map runner results into `verification.poc_status`. A raw runner status is not itself a verification decision.
 
 | Runner / phase result | `poc_status` | Meaning |
 |---|---|---|
-| Expected crash, unsafe behavior, or deterministic vulnerability signal observed | `verified` | Runtime evidence confirms the finding. |
+| Expected crash, unsafe behavior, timeout, exit code, or deterministic output pattern observed | `verified` | Runtime evidence confirms the expected signal. |
 | Test executed cleanly and the expected signal was absent | `failed` | The PoC did not reproduce the issue under this sandbox. |
-| PoC could not run because required local preconditions were absent | `inconclusive` | The finding remains statically supported but not runtime-confirmed. |
+| Runner result did not prove or disprove the expected signal | `inconclusive` | The finding remains statically supported but not runtime-confirmed. |
 | PoC script missing, malformed, unreadable, or internally failed before exercising the target | `poc_error` | The PoC artifact failed; do not treat as a false positive. |
 | Sandbox runtime, image build, mount, seccomp, or result collection failed | `sandbox_error` | Infrastructure failed; rerun after fixing the sandbox. |
 | Finding was not eligible or user approval was not granted | `skipped` | No runtime validation attempted. |
+
+`completed` does not mean `verified`; it means the runner exited cleanly. `crash` does not mean `verified` unless the expected signal is a crash or the configured expected signal matches the observed output.
 
 ## Output
 
@@ -76,6 +94,9 @@ Each `poc_result` should include:
 - `runner_status_path`
 - `result_dir`
 - `failure_reason` when applicable
+- interpreted `poc_status`
+- interpreted `finding_status`
+- interpreter reason
 
 ## Error Handling
 
