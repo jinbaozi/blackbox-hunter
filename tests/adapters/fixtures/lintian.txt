@@ -1,0 +1,2 @@
+E: demo: setuid-binary usr/bin/demo 4755 root/root
+W: demo: maintainer-script-uses-dpkg-status-directly postinst
