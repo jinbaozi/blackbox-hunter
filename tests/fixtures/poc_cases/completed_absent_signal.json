@@ -1,0 +1,13 @@
+{
+  "expected_signal": {
+    "type": "pattern",
+    "pattern": "VERIFY_SIGNAL"
+  },
+  "runner_result": {
+    "status": "completed",
+    "exit_code": 0,
+    "timeout": false,
+    "stdout_path": "",
+    "stderr_path": ""
+  }
+}
