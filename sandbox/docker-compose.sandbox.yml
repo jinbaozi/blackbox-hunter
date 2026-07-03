@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile.poc
       args:
         TARGETARCH: ${TARGETARCH:-amd64}
-    container_name: ${CONTAINER_NAME:-bbh-poc-sandbox}
+    container_name: ${CONTAINER_NAME:-bbh-poc-sandbox-${SCAN_ID:-local}}
     network_mode: "none"
     read_only: true
     security_opt:
