@@ -90,7 +90,18 @@ assert tools["primary-required"]["fallback_used"] == "fallback-ok"
 assert tools["lowtool"]["status"] == "version_low"
 assert tools["rpm-only"]["status"] == "skipped_not_applicable"
 assert data["block_decision"]["blocked"] is False
-assert data["block_decision"]["phase_blocks"][0]["phase"] == "phase_3"
+
+# The required_verify runtime may legitimately be available on CI hosts. When it
+# is unavailable, preflight must phase-block Phase 3; when available, no phase
+# block is expected. The test should validate both allowed outcomes rather than
+# assuming a particular CI image has or lacks Docker.
+docker_status = tools["docker"]["status"]
+phase_blocks = data["block_decision"].get("phase_blocks") or []
+if docker_status == "available":
+    assert phase_blocks == []
+else:
+    assert any(block.get("phase") == "phase_3" and block.get("tool") == "docker" for block in phase_blocks)
+
 assert data["confidence_ceiling"] < 0.95
 PY
 
