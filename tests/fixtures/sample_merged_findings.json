@@ -3,6 +3,7 @@
     {
       "finding": {
         "finding_id": "TB-001",
+        "finding_status": "confirmed_static",
         "source": {
           "track": "B",
           "tool": "ghidra",
@@ -13,7 +14,21 @@
           "title": "Unchecked copy into fixed stack buffer",
           "cwe_id": "CWE-120",
           "severity": "high",
-          "confidence": 0.82
+          "confidence": 0.79
+        },
+        "confidence_breakdown": {
+          "evidence": 0.87,
+          "reachability": 0.85,
+          "tool_reliability": 0.75,
+          "verification": 0.5,
+          "final": 0.79,
+          "caps_applied": [],
+          "adjustments": [
+            "source-to-sink evidence +0.10",
+            "function/address evidence +0.05",
+            "attack surface identified +0.15"
+          ],
+          "reason": "static source-to-sink evidence with untested PoC"
         },
         "location": {
           "binary": "/usr/bin/sampled",
@@ -27,7 +42,9 @@
           "supporting_files": [
             "ghidra/parse_request.c"
           ],
-          "reproduction_hint": "Pass an oversized request field."
+          "reproduction_hint": "Pass an oversized request field.",
+          "source_to_sink": "recv -> parse_request -> strcpy",
+          "guard_analysis": "No length guard is visible before the copy."
         },
         "attack_surface": {
           "type": "network",
@@ -56,7 +73,8 @@
         "merged_from": [
           "TB-001"
         ],
-        "rule": "single-source"
+        "rule": "single-source",
+        "signal_refs": []
       }
     }
   ],
@@ -65,7 +83,27 @@
     "output": 1
   },
   "confidence_scores": {
-    "TB-001": 0.82
+    "TB-001": {
+      "evidence": 0.87,
+      "reachability": 0.85,
+      "tool_reliability": 0.75,
+      "verification": 0.5,
+      "final": 0.79,
+      "caps_applied": [],
+      "adjustments": [
+        "source-to-sink evidence +0.10",
+        "function/address evidence +0.05",
+        "attack surface identified +0.15"
+      ],
+      "reason": "static source-to-sink evidence with untested PoC"
+    }
+  },
+  "lifecycle_stats": {
+    "candidate": 0,
+    "confirmed_static": 1,
+    "verified": 0,
+    "false_positive": 0,
+    "inconclusive": 0
   },
   "coverage_summary": {
     "binaries_seen": 1,
