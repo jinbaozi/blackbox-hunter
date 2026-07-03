@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile.poc
       args:
         TARGETARCH: ${TARGETARCH:-amd64}
-    container_name: bbh-poc-sandbox
+    container_name: ${CONTAINER_NAME:-bbh-poc-sandbox}
     network_mode: "none"
     read_only: true
     security_opt:
@@ -17,7 +17,7 @@ services:
       - ALL
     tmpfs:
       - /tmp:size=256m
-      - /workspace:size=512m,uid=1000,gid=1000
+      - /workspace/tmp:size=512m,uid=1000,gid=1000
     deploy:
       resources:
         limits:
@@ -33,6 +33,11 @@ services:
         source: ${PACKAGE_DIR:-./pkg}
         target: /pkg
         read_only: true
+      - type: bind
+        source: ${RESULTS_DIR:-./results}
+        target: /workspace/results
+        read_only: false
     environment:
       POC_SCRIPT: ${POC_SCRIPT:-/poc/run.sh}
       TIMEOUT: ${TIMEOUT:-300}
+      OUTPUT_DIR: /workspace/results
