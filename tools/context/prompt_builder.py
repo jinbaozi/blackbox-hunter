@@ -22,6 +22,19 @@ except ModuleNotFoundError:  # allow direct execution from tools/context
     from evidence_trimmer import wrap_untrusted_evidence
     from token_budget import ensure_within_budget, estimate_tokens
 
+DIMENSION_TO_EVIDENCE_KIND = {
+    "dangerous_functions": "disassembly",
+    "input_validation": "decompiled_c",
+    "control_flow": "disassembly",
+    "memory_management": "decompiled_c",
+    "privilege_model": "metadata",
+    "protocol_parsing": "decompiled_c",
+    "hardcoded_config": "strings",
+    "crypto_tls_auth": "config",
+    "filesystem_path_traversal": "script",
+    "ipc_local_service": "metadata",
+}
+
 
 @dataclass
 class BuiltPrompt:
@@ -69,6 +82,15 @@ def max_tokens_for_mode(policy: dict[str, Any], mode: str, fallback: int) -> int
     return int(mode_policy.get("max_prompt_tokens_per_call") or fallback)
 
 
+def evidence_kind_for_dimension(policy: dict[str, Any], dimension: str, evidence_json: dict[str, Any]) -> str:
+    explicit = evidence_json.get("evidence_kind") or evidence_json.get("kind")
+    kind = str(explicit or DIMENSION_TO_EVIDENCE_KIND.get(dimension, "metadata"))
+    allowed = set(((policy.get("untrusted_evidence") or {}).get("allowed_kinds") or []))
+    if allowed and kind not in allowed:
+        raise ValueError(f"unsupported untrusted evidence kind {kind!r} for dimension {dimension!r}")
+    return kind
+
+
 def validate_dimension_allowed(manifest: dict[str, Any], mode: str, dimension: str) -> None:
     if dimension not in manifest["dimensions"]:
         raise ValueError(f"unknown Track B dimension: {dimension}")
@@ -103,13 +125,13 @@ def build_track_b_prompt(
     ]
 
     stable_prefix = "\n\n".join(load_text(root, item) for item in loaded_files)
-    evidence_kind = evidence_json.get("dimension") or dimension
+    evidence_kind = evidence_kind_for_dimension(policy, dimension, evidence_json)
     evidence_source = ",".join(evidence_json.get("supporting_files") or ["bounded_evidence_slice"])
     injection_findings = list(evidence_json.get("injection_findings") or [])
     evidence_block = wrap_untrusted_evidence(
         evidence_json=evidence_json,
         source=evidence_source,
-        kind=str(evidence_kind),
+        kind=evidence_kind,
     )
 
     dynamic_suffix = f"""
