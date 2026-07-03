@@ -2,7 +2,9 @@
 """Base types and helpers for Track A tool adapters."""
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
@@ -71,6 +73,15 @@ def signal_id(prefix: str, index: int) -> str:
     return f"{prefix}-{index:03d}"
 
 
+def scoped_signal_id(signal_id_value: str, tool: str, supporting_file: str) -> str:
+    """Make adapter-local IDs globally stable without requiring a central allocator."""
+    match = re.match(r"^(SIG-[AB])-([0-9]{3,})$", signal_id_value)
+    if not match:
+        return signal_id_value
+    digest = hashlib.sha1(f"{tool}:{supporting_file}".encode("utf-8", errors="replace")).hexdigest()[:8]
+    return f"{match.group(1)}-{tool}-{digest}-{match.group(2)}"
+
+
 def make_signal(
     *,
     signal_id_value: str,
@@ -88,8 +99,11 @@ def make_signal(
     promotion_reason: str = "requires contextual confirmation before promotion",
     metadata: dict[str, Any] | None = None,
 ) -> FindingSignal:
+    scoped_id = scoped_signal_id(signal_id_value, tool, supporting_file)
+    meta = dict(metadata or {})
+    meta.setdefault("adapter_local_signal_id", signal_id_value)
     return FindingSignal(
-        signal_id=signal_id_value,
+        signal_id=scoped_id,
         source={"track": "A", "tool": tool},
         signal_type=signal_type,
         location=location or {},
@@ -106,7 +120,7 @@ def make_signal(
         confidence=confidence,
         cwe_id=cwe_id,
         cve_id=cve_id,
-        metadata=metadata or {},
+        metadata=meta,
     )
 
 
