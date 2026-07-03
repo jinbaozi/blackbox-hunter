@@ -29,9 +29,3 @@ jobs:
 
       - name: Run unified validation suite
         run: bash tests/run_all_tests.sh
-
-      - name: Run E2E regression tests
-        run: bash tests/validate_e2e_regression.sh
-
-      - name: Run context pollution regression tests
-        run: bash tests/validate_security_regression.sh
