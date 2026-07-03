@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "default": {
+    "max_prompt_tokens": 6000,
+    "max_untrusted_evidence_tokens": 2500,
+    "max_raw_excerpt_chars": 12000,
+    "fail_closed_on_budget_exceeded": true
+  },
+  "forbidden_runtime_context": [
+    "README.md",
+    "raw/**",
+    "tests/**",
+    ".git/**",
+    "$SCAN_ROOT/raw/**",
+    "$SCAN_ROOT/logs/**"
+  ],
+  "allowed_runtime_context": [
+    "SKILL.md",
+    "AGENTS.md",
+    "phases/phase-*.md",
+    "prompts/**",
+    "templates/*.json",
+    "$SCAN_ROOT/*_summary.json",
+    "$SCAN_ROOT/context/*.json"
+  ],
+  "track_b": {
+    "quick": {
+      "function_limit": 5,
+      "dimensions": [
+        "dangerous_functions",
+        "hardcoded_config"
+      ],
+      "max_prompt_tokens_per_call": 3000
+    },
+    "standard": {
+      "function_limit": 20,
+      "dimensions": [
+        "dangerous_functions",
+        "input_validation",
+        "memory_management",
+        "privilege_model",
+        "hardcoded_config"
+      ],
+      "max_prompt_tokens_per_call": 4500
+    },
+    "deep": {
+      "function_limit": 50,
+      "dimensions": "all_core",
+      "max_prompt_tokens_per_call": 6000
+    },
+    "full": {
+      "function_limit": "all_reachable",
+      "dimensions": "all",
+      "max_prompt_tokens_per_call": 8000
+    }
+  },
+  "untrusted_evidence": {
+    "wrapper_required": true,
+    "wrapper_tag": "UNTRUSTED_EVIDENCE",
+    "allowed_kinds": [
+      "decompiled_c",
+      "disassembly",
+      "strings",
+      "tool_output",
+      "config",
+      "script",
+      "metadata",
+      "log",
+      "poc_output"
+    ]
+  },
+  "context_manifest": {
+    "required": true,
+    "output_dir": "$SCAN_ROOT/context"
+  }
+}
