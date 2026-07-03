@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/context_manifest.json",
+  "title": "Runtime Context Manifest",
+  "type": "object",
+  "required": [
+    "context_id",
+    "phase",
+    "loaded_files",
+    "excluded_files",
+    "untrusted_sources",
+    "token_budget"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "context_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "phase": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dimension": {
+      "type": ["string", "null"]
+    },
+    "target": {
+      "type": ["string", "null"]
+    },
+    "function": {
+      "type": ["string", "null"]
+    },
+    "loaded_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "excluded_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "untrusted_sources": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "injection_findings": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "token_budget": {
+      "type": "object",
+      "required": ["max", "estimated"],
+      "additionalProperties": false,
+      "properties": {
+        "max": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "estimated": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cached_tokens": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "context_profile": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
