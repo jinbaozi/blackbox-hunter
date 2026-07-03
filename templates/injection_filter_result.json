@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/injection_filter_result.json",
+  "title": "Prompt Injection Filter Result",
+  "type": "object",
+  "required": [
+    "suspicious",
+    "matches",
+    "normalized_preview",
+    "policy"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "suspicious": {
+      "type": "boolean"
+    },
+    "matches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "pattern",
+          "offset",
+          "severity",
+          "excerpt",
+          "source"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "pattern": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "normalized_preview": {
+      "type": "string"
+    },
+    "policy": {
+      "type": "string",
+      "enum": [
+        "wrapped_not_removed"
+      ]
+    }
+  }
+}

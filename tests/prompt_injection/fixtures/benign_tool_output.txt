@@ -1,0 +1,1 @@
+checksec output: NX enabled, PIE enabled, RELRO full. No suspicious prompt-like text here.
