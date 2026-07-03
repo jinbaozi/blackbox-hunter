@@ -1,0 +1,139 @@
+{
+  "version": 1,
+  "base_contract": "prompts/track_b/base_contract.md",
+  "evidence_wrapper": "prompts/track_b/evidence_wrapper.md",
+  "output_contract": "prompts/track_b/output_contract.md",
+  "core_dimensions": [
+    "dangerous_functions",
+    "input_validation",
+    "control_flow",
+    "memory_management",
+    "privilege_model",
+    "protocol_parsing",
+    "hardcoded_config"
+  ],
+  "extended_dimensions": [
+    "crypto_tls_auth",
+    "filesystem_path_traversal",
+    "ipc_local_service"
+  ],
+  "mode_defaults": {
+    "quick": [
+      "dangerous_functions",
+      "hardcoded_config"
+    ],
+    "standard": [
+      "dangerous_functions",
+      "input_validation",
+      "memory_management",
+      "privilege_model",
+      "hardcoded_config"
+    ],
+    "deep": "core_dimensions",
+    "full": "all_dimensions"
+  },
+  "dimensions": {
+    "dangerous_functions": {
+      "path": "prompts/track_b/dimensions/dangerous_functions.md",
+      "max_context_tokens": 1800,
+      "requires": [
+        "function_metadata",
+        "imports",
+        "xrefs",
+        "body_excerpt",
+        "attack_surface"
+      ]
+    },
+    "input_validation": {
+      "path": "prompts/track_b/dimensions/input_validation.md",
+      "max_context_tokens": 2200,
+      "requires": [
+        "function_metadata",
+        "sources",
+        "sinks",
+        "guards",
+        "body_excerpt"
+      ]
+    },
+    "control_flow": {
+      "path": "prompts/track_b/dimensions/control_flow.md",
+      "max_context_tokens": 2000,
+      "requires": [
+        "function_metadata",
+        "xrefs",
+        "call_targets",
+        "body_excerpt"
+      ]
+    },
+    "memory_management": {
+      "path": "prompts/track_b/dimensions/memory_management.md",
+      "max_context_tokens": 2200,
+      "requires": [
+        "function_metadata",
+        "allocation_sites",
+        "cleanup_paths",
+        "body_excerpt"
+      ]
+    },
+    "privilege_model": {
+      "path": "prompts/track_b/dimensions/privilege_model.md",
+      "max_context_tokens": 2000,
+      "requires": [
+        "function_metadata",
+        "privilege_context",
+        "attack_surface",
+        "body_excerpt"
+      ]
+    },
+    "protocol_parsing": {
+      "path": "prompts/track_b/dimensions/protocol_parsing.md",
+      "max_context_tokens": 2200,
+      "requires": [
+        "function_metadata",
+        "format_fields",
+        "parser_state",
+        "body_excerpt"
+      ]
+    },
+    "hardcoded_config": {
+      "path": "prompts/track_b/dimensions/hardcoded_config.md",
+      "max_context_tokens": 1600,
+      "requires": [
+        "strings_excerpt",
+        "config_excerpt",
+        "file_metadata",
+        "attack_surface"
+      ]
+    },
+    "crypto_tls_auth": {
+      "path": "prompts/track_b/dimensions/crypto_tls_auth.md",
+      "max_context_tokens": 2000,
+      "requires": [
+        "function_metadata",
+        "crypto_symbols",
+        "config_excerpt",
+        "body_excerpt"
+      ]
+    },
+    "filesystem_path_traversal": {
+      "path": "prompts/track_b/dimensions/filesystem_path_traversal.md",
+      "max_context_tokens": 2000,
+      "requires": [
+        "function_metadata",
+        "path_operations",
+        "config_excerpt",
+        "body_excerpt"
+      ]
+    },
+    "ipc_local_service": {
+      "path": "prompts/track_b/dimensions/ipc_local_service.md",
+      "max_context_tokens": 2000,
+      "requires": [
+        "service_metadata",
+        "ipc_entry_points",
+        "function_metadata",
+        "body_excerpt"
+      ]
+    }
+  }
+}

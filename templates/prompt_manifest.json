@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/prompt_manifest.json",
+  "title": "Track B Prompt Manifest",
+  "type": "object",
+  "required": [
+    "version",
+    "base_contract",
+    "evidence_wrapper",
+    "output_contract",
+    "core_dimensions",
+    "extended_dimensions",
+    "mode_defaults",
+    "dimensions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "base_contract": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_wrapper": {
+      "type": "string",
+      "minLength": 1
+    },
+    "output_contract": {
+      "type": "string",
+      "minLength": 1
+    },
+    "core_dimensions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "extended_dimensions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "mode_defaults": {
+      "type": "object",
+      "required": [
+        "quick",
+        "standard",
+        "deep",
+        "full"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "quick": {
+          "$ref": "#/$defs/dimensionSelection"
+        },
+        "standard": {
+          "$ref": "#/$defs/dimensionSelection"
+        },
+        "deep": {
+          "$ref": "#/$defs/dimensionSelection"
+        },
+        "full": {
+          "$ref": "#/$defs/dimensionSelection"
+        }
+      }
+    },
+    "dimensions": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "path",
+          "max_context_tokens",
+          "requires"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "max_context_tokens": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "requires": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "dimensionSelection": {
+      "oneOf": [
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "string",
+          "enum": [
+            "core_dimensions",
+            "all_dimensions"
+          ]
+        }
+      ]
+    }
+  }
+}
