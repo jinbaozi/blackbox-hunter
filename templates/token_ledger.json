@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/token_ledger.json",
+  "title": "Token Usage Record",
+  "type": "object",
+  "required": [
+    "scan_id",
+    "phase",
+    "dimension",
+    "target",
+    "prompt_tokens_estimated"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "scan_id": {
+      "type": "string"
+    },
+    "phase": {
+      "type": "string"
+    },
+    "dimension": {
+      "type": "string"
+    },
+    "target": {
+      "type": "string"
+    },
+    "function": {
+      "type": ["string", "null"]
+    },
+    "prompt_tokens_estimated": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "prompt_tokens_actual": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "cached_tokens": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "completion_tokens": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "truncated": {
+      "type": "boolean"
+    },
+    "context_profile": {
+      "type": "string"
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
