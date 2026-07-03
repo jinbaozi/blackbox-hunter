@@ -32,6 +32,7 @@ class BuiltPrompt:
     estimated_tokens: int
     max_prompt_tokens: int
     context_profile: str
+    injection_findings: list[dict[str, Any]]
     context_manifest_path: str | None = None
 
     def metadata(self) -> dict[str, Any]:
@@ -104,6 +105,7 @@ def build_track_b_prompt(
     stable_prefix = "\n\n".join(load_text(root, item) for item in loaded_files)
     evidence_kind = evidence_json.get("dimension") or dimension
     evidence_source = ",".join(evidence_json.get("supporting_files") or ["bounded_evidence_slice"])
+    injection_findings = list(evidence_json.get("injection_findings") or [])
     evidence_block = wrap_untrusted_evidence(
         evidence_json=evidence_json,
         source=evidence_source,
@@ -117,6 +119,7 @@ mode: {mode}
 dimension: {dimension}
 target: {target or evidence_json.get('binary', '')}
 function: {function or evidence_json.get('function', '')}
+suspicious_evidence: {bool(injection_findings)}
 
 # Bounded Evidence Slice
 
@@ -160,7 +163,7 @@ function: {function or evidence_json.get('function', '')}
             excluded_files=excluded_files,
             untrusted_sources=untrusted_sources,
             token_budget={"max": max_tokens, "estimated": estimated},
-            injection_findings=[],
+            injection_findings=injection_findings,
             context_profile=context_profile,
         )
         write_context_manifest(context_manifest_path, manifest_record)
@@ -174,6 +177,7 @@ function: {function or evidence_json.get('function', '')}
         estimated_tokens=estimated,
         max_prompt_tokens=max_tokens,
         context_profile=context_profile,
+        injection_findings=injection_findings,
         context_manifest_path=written_manifest_path,
     )
 
