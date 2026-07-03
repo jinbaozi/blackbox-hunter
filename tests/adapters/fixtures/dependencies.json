@@ -1,0 +1,7 @@
+{
+  "imports": [
+    "libssl.so.3",
+    "libcurl.so.4",
+    "libc.so.6"
+  ]
+}
