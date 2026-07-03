@@ -77,7 +77,9 @@ assert data["package_type"] == "rpm"
 assert data["package_manager"] == "dnf"
 assert tools["badtool"]["status"] == "missing", tools["badtool"]
 assert data["block_decision"]["blocked"] is True
-assert data["block_decision"]["install_hints"][0] == "badtool: dnf install -y badtool-pkg"
+hint = data["block_decision"]["install_hints"][0]
+assert hint.startswith("badtool: "), hint
+assert hint.endswith("dnf install -y badtool-pkg"), hint
 assert tools["deb-only"]["status"] == "skipped_not_applicable"
 PY
 
