@@ -1,0 +1,3 @@
+dangerous_command_execution /usr/bin/demo
+dangerous_string_functions /usr/bin/demo
+warning: rule slow_rule is slow
