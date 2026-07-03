@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/context_policy.json",
+  "title": "Runtime Context Policy",
+  "type": "object",
+  "required": [
+    "version",
+    "default",
+    "forbidden_runtime_context",
+    "allowed_runtime_context",
+    "track_b",
+    "untrusted_evidence",
+    "context_manifest"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "default": {
+      "type": "object",
+      "required": [
+        "max_prompt_tokens",
+        "max_untrusted_evidence_tokens",
+        "max_raw_excerpt_chars",
+        "fail_closed_on_budget_exceeded"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max_prompt_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_untrusted_evidence_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_raw_excerpt_chars": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "fail_closed_on_budget_exceeded": {
+          "type": "boolean"
+        }
+      }
+    },
+    "forbidden_runtime_context": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "allowed_runtime_context": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "track_b": {
+      "type": "object",
+      "required": [
+        "quick",
+        "standard",
+        "deep",
+        "full"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "quick": {
+          "$ref": "#/$defs/mode"
+        },
+        "standard": {
+          "$ref": "#/$defs/mode"
+        },
+        "deep": {
+          "$ref": "#/$defs/mode"
+        },
+        "full": {
+          "$ref": "#/$defs/mode"
+        }
+      }
+    },
+    "untrusted_evidence": {
+      "type": "object",
+      "required": [
+        "wrapper_required",
+        "wrapper_tag",
+        "allowed_kinds"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "wrapper_required": {
+          "type": "boolean"
+        },
+        "wrapper_tag": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allowed_kinds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "context_manifest": {
+      "type": "object",
+      "required": [
+        "required",
+        "output_dir"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "type": "boolean"
+        },
+        "output_dir": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "mode": {
+      "type": "object",
+      "required": [
+        "function_limit",
+        "dimensions",
+        "max_prompt_tokens_per_call"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "function_limit": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ]
+        },
+        "dimensions": {
+          "oneOf": [
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ]
+        },
+        "max_prompt_tokens_per_call": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}
