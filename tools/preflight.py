@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""BlackBox Hunter environment preflight.
-
-The scanner uses this helper through tools/install.sh. The helper detects
-available tools, records package-type-aware install hints, and optionally runs
-user-approved installs in interactive sessions.
-"""
+"""BlackBox Hunter environment preflight."""
 from __future__ import annotations
 
 import argparse
@@ -38,7 +33,13 @@ PKG_MANAGER_BINARIES = {
     "rpm-ostree": "rpm-ostree",
     "brew": "brew",
 }
-RPM_NATIVE_MANAGERS = ["dnf", "microdnf", "yum", "zypper", "rpm-ostree"]
+DEFAULT_MANAGER_PRIORITY = {
+    "rpm": ["dnf", "microdnf", "yum", "zypper", "rpm-ostree", "apt", "brew"],
+    "deb": ["apt", "dnf", "microdnf", "yum", "zypper", "rpm-ostree", "brew"],
+    "": ["apt", "dnf", "microdnf", "yum", "zypper", "rpm-ostree", "brew"],
+}
+RPM_NATIVE_MANAGERS = {"dnf", "microdnf", "yum", "zypper", "rpm-ostree"}
+PACKAGE_MANAGER_METHODS = set(PKG_MANAGER_BINARIES)
 
 
 def parse_args() -> argparse.Namespace:
@@ -48,6 +49,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--auto-fix", action="store_true")
     parser.add_argument("--package-type", choices=["deb", "rpm"], default="")
+    parser.add_argument("--package-path", default="", help="Optional package path used to infer package type")
     parser.add_argument("--output", default="")
     parser.add_argument("--scan-root", default="")
     parser.add_argument("--registry", default=str(DEFAULT_REGISTRY))
@@ -58,7 +60,18 @@ def now_iso() -> str:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def load_registry(path: str) -> tuple[Path, list[dict[str, Any]]]:
+def infer_package_type(args: argparse.Namespace) -> str:
+    if args.package_type:
+        return args.package_type
+    suffix = Path(args.package_path).suffix.lower()
+    if suffix == ".rpm":
+        return "rpm"
+    if suffix == ".deb":
+        return "deb"
+    return ""
+
+
+def load_registry(path: str) -> tuple[Path, dict[str, Any], list[dict[str, Any]]]:
     registry_path = Path(path).expanduser().resolve()
     if not registry_path.exists():
         raise SystemExit(f"ERROR: tool registry not found: {registry_path}")
@@ -68,7 +81,7 @@ def load_registry(path: str) -> tuple[Path, list[dict[str, Any]]]:
         raise SystemExit(f"ERROR: malformed tool registry {registry_path}: {exc}") from exc
     if not isinstance(data.get("tools"), list):
         raise SystemExit(f"ERROR: registry {registry_path} must contain a tools array")
-    return registry_path, data["tools"]
+    return registry_path, data, data["tools"]
 
 
 def output_path(args: argparse.Namespace) -> Path:
@@ -87,18 +100,17 @@ def detect_platform() -> str:
     return "unknown"
 
 
-def detect_pkg_manager(package_type: str = "") -> str:
-    """Return the preferred package manager for the target package type."""
+def manager_priority(registry: dict[str, Any], package_type: str) -> list[str]:
+    configured = registry.get("package_manager_priority") or {}
+    values = configured.get(package_type) or DEFAULT_MANAGER_PRIORITY.get(package_type) or DEFAULT_MANAGER_PRIORITY[""]
+    return [str(item) for item in values]
 
+
+def detect_pkg_manager(package_type: str, registry: dict[str, Any]) -> str:
     if sys.platform == "darwin":
         order = ["brew"]
-    elif package_type == "rpm":
-        order = ["dnf", "microdnf", "yum", "zypper", "rpm-ostree", "apt", "brew"]
-    elif package_type == "deb":
-        order = ["apt", "dnf", "microdnf", "yum", "zypper", "rpm-ostree", "brew"]
     else:
-        order = ["apt", "dnf", "microdnf", "yum", "zypper", "rpm-ostree", "brew"]
-
+        order = manager_priority(registry, package_type)
     for name in order:
         if shutil.which(PKG_MANAGER_BINARIES.get(name, name)):
             return name
@@ -115,24 +127,24 @@ def dedupe(items: list[str]) -> list[str]:
     return output
 
 
-def resolve_install_priority(tool: dict[str, Any], args: argparse.Namespace, package_manager: str) -> list[str]:
-    methods = list(tool.get("install_priority") or [])
+def resolve_install_priority(tool: dict[str, Any], package_type: str, package_manager: str, registry: dict[str, Any]) -> list[str]:
+    methods = [str(item) for item in (tool.get("install_priority") or [])]
     if not methods:
         return []
-
-    if args.package_type != "rpm":
+    if package_type != "rpm":
         return methods
 
     cmds = tool.get("install_cmds") or {}
+    system_packages = tool.get("system_packages") or {}
     rpm_first: list[str] = []
     if package_manager in RPM_NATIVE_MANAGERS:
         rpm_first.append(package_manager)
-    rpm_first.extend(RPM_NATIVE_MANAGERS)
-    rpm_first.extend(["docker", "snap", "script", "pipx", "npm", "pip", "apt", "brew", "manual"])
+    rpm_first.extend(manager_priority(registry, "rpm"))
+    rpm_first.extend(["docker", "snap", "script", "pipx", "npm", "pip", "manual"])
 
     ordered: list[str] = []
     for method in dedupe(rpm_first):
-        if method in methods or method in cmds:
+        if method in methods or method in cmds or method in system_packages:
             ordered.append(method)
     ordered.extend(method for method in methods if method not in ordered)
     return ordered
@@ -241,9 +253,33 @@ def version_is_low(detected: str, required: str) -> bool:
     return left < right
 
 
-def install_hints(tool: dict[str, Any], args: argparse.Namespace, package_manager: str) -> list[str]:
-    methods = resolve_install_priority(tool, args, package_manager)
+def sudo_prefix() -> list[str]:
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        return []
+    return ["sudo"] if shutil.which("sudo") else []
+
+
+def system_install_argv(method: str, packages: list[str]) -> list[str]:
+    if not packages:
+        return []
+    prefix = sudo_prefix()
+    if method == "apt":
+        return prefix + ["apt-get", "install", "-y"] + packages
+    if method in {"dnf", "microdnf", "yum"}:
+        return prefix + [method, "install", "-y"] + packages
+    if method == "zypper":
+        return prefix + ["zypper", "install", "-y"] + packages
+    if method == "rpm-ostree":
+        return prefix + ["rpm-ostree", "install"] + packages
+    if method == "brew":
+        return ["brew", "install"] + packages
+    return []
+
+
+def install_hints(tool: dict[str, Any], args: argparse.Namespace, package_type: str, package_manager: str, registry: dict[str, Any]) -> list[str]:
+    methods = resolve_install_priority(tool, package_type, package_manager, registry)
     cmds = tool.get("install_cmds") or {}
+    system_packages = tool.get("system_packages") or {}
     hints: list[str] = []
     for method in methods:
         if method == "pipx":
@@ -252,17 +288,23 @@ def install_hints(tool: dict[str, Any], args: argparse.Namespace, package_manage
             hints.append(f"pip install --user {tool['name']}")
         elif method == "npm" and tool.get("npm_package"):
             hints.append(f"npm install -g {tool['npm_package']}")
+        elif method in system_packages:
+            argv = system_install_argv(method, [str(item) for item in system_packages[method]])
+            if argv:
+                hints.append(shlex.join(argv))
         elif method in cmds:
-            hints.append(str(cmds[method]))
+            value = cmds[method]
+            hints.append(shlex.join(value) if isinstance(value, list) else str(value))
         elif method == "manual" and cmds.get("manual"):
             hints.append(str(cmds["manual"]))
     if not hints:
-        hints.extend(str(value) for value in cmds.values())
+        hints.extend(str(value) for value in cmds.values() if isinstance(value, str))
     return dedupe(hints)
 
 
 def install_command_for_method(method: str, tool: dict[str, Any]) -> list[str]:
     cmds = tool.get("install_cmds") or {}
+    system_packages = tool.get("system_packages") or {}
     if method == "pipx":
         return ["pipx", "install", tool["name"]]
     if method == "pip":
@@ -270,10 +312,17 @@ def install_command_for_method(method: str, tool: dict[str, Any]) -> list[str]:
     if method == "npm":
         package = tool.get("npm_package")
         return ["npm", "install", "-g", package] if package else []
+    if method in system_packages:
+        return system_install_argv(method, [str(item) for item in system_packages[method]])
+    if method == "docker" and tool.get("container_image"):
+        return ["docker", "pull", str(tool["container_image"])]
     if method == "manual":
         return []
     if method in cmds:
-        return split_command(str(cmds[method]))
+        value = cmds[method]
+        if isinstance(value, list):
+            return [str(item) for item in value]
+        return split_command(str(value))
     return []
 
 
@@ -299,13 +348,13 @@ def confirm_fallback(tool_name: str, fallback_name: str) -> tuple[bool, str]:
     return False, "user declined fallback"
 
 
-def maybe_install(tool: dict[str, Any], args: argparse.Namespace, package_manager: str) -> tuple[bool, str, str]:
+def maybe_install(tool: dict[str, Any], args: argparse.Namespace, package_type: str, package_manager: str, registry: dict[str, Any]) -> tuple[bool, str, str]:
     if args.check_only:
         return False, "", "check-only mode: install skipped"
     if args.offline:
         return False, "", "offline mode: install skipped"
 
-    for method in resolve_install_priority(tool, args, package_manager):
+    for method in resolve_install_priority(tool, package_type, package_manager, registry):
         argv = install_command_for_method(method, tool)
         if not argv:
             continue
@@ -335,8 +384,11 @@ def is_applicable(tool: dict[str, Any], package_type: str, platform: str) -> tup
     if platforms and platform not in platforms:
         return False, f"platform {platform} not in {platforms}"
     applies_to = tool.get("applies_to") or ""
-    if applies_to and package_type and applies_to != package_type:
-        return False, f"applies_to {applies_to}, package-type {package_type}"
+    if applies_to:
+        if not package_type:
+            return False, f"applies_to {applies_to}, package-type unknown"
+        if applies_to != package_type:
+            return False, f"applies_to {applies_to}, package-type {package_type}"
     return True, ""
 
 
@@ -370,13 +422,16 @@ def detect_host_binary_tool(tool: dict[str, Any], path_state: dict[str, bool]) -
 
     detect_cmd = tool.get("detect_cmd") or f"{shlex.quote(binary)} --version"
     result = run_command(detect_cmd)
-    detected_version = ""
-    error_message = ""
-    if result.returncode == 0:
-        detected_version = extract_version((result.stdout or "") + "\n" + (result.stderr or ""))
-    else:
-        error_message = ((result.stderr or result.stdout or "").strip() or f"detect command exited {result.returncode}")
-    return {"available": True, "found_in": str(found), "detected_version": detected_version, "error_message": error_message}
+    output = (result.stdout or "") + "\n" + (result.stderr or "")
+    if result.returncode != 0 and not tool.get("detect_nonzero_ok", False):
+        message = (result.stderr or result.stdout or "").strip()
+        return {
+            "available": False,
+            "found_in": str(found),
+            "detected_version": "",
+            "error_message": message or f"detect command exited {result.returncode}",
+        }
+    return {"available": True, "found_in": str(found), "detected_version": extract_version(output), "error_message": ""}
 
 
 def detect_tool(tool: dict[str, Any], path_state: dict[str, bool]) -> dict[str, str | bool]:
@@ -395,11 +450,32 @@ def detect_fallback(fallback: str, tools_by_name: dict[str, dict[str, Any]], pat
     return bool(found), str(found) if found else "", fallback
 
 
+def mark_after_install(tool: dict[str, Any], method: str, path_state: dict[str, bool], record: dict[str, Any]) -> None:
+    after = detect_tool(tool, path_state)
+    if not after["available"]:
+        record["status"] = "install_failed"
+        record["install_method"] = method
+        record["error_message"] = after["error_message"] or "install verification failed"
+        return
+    record["status"] = "available"
+    record["found_in"] = after["found_in"]
+    record["install_method"] = method
+    if after["detected_version"]:
+        record["detected_version"] = after["detected_version"]
+    if tool.get("version_min"):
+        record["required_version"] = tool["version_min"]
+        if version_is_low(str(after["detected_version"]), tool["version_min"]):
+            record["status"] = "version_low"
+            record["error_message"] = f"installed version below required minimum {tool['version_min']}"
+
+
 def make_tool_record(
     tool: dict[str, Any],
     args: argparse.Namespace,
+    package_type: str,
     platform: str,
     package_manager: str,
+    registry: dict[str, Any],
     tools_by_name: dict[str, dict[str, Any]],
     path_state: dict[str, bool],
 ) -> dict[str, Any]:
@@ -419,7 +495,7 @@ def make_tool_record(
     if tool.get("container_engine"):
         record["container_engine"] = tool["container_engine"]
 
-    applicable, reason = is_applicable(tool, args.package_type, platform)
+    applicable, reason = is_applicable(tool, package_type, platform)
     if not applicable:
         record.update({"status": "skipped_not_applicable", "applicable": False, "error_message": reason})
         return record
@@ -434,54 +510,32 @@ def make_tool_record(
             record["required_version"] = tool["version_min"]
             if version_is_low(str(detection["detected_version"]), tool["version_min"]):
                 record["status"] = "version_low"
-                install_ok, method, error = maybe_install(tool, args, package_manager)
+                install_ok, method, error = maybe_install(tool, args, package_type, package_manager, registry)
                 if install_ok:
-                    after = detect_tool(tool, path_state)
-                    if after["available"]:
-                        record["status"] = "available"
-                        record["found_in"] = after["found_in"]
-                        record["install_method"] = method
-                        if after["detected_version"]:
-                            record["detected_version"] = after["detected_version"]
-                    else:
-                        record["status"] = "install_failed"
-                        record["install_method"] = method
-                        record["error_message"] = after["error_message"] or "install verification failed"
+                    mark_after_install(tool, method, path_state, record)
                 elif error:
                     record["error_message"] = error
-        if detection["error_message"]:
-            record["error_message"] = detection["error_message"]
     else:
-        install_ok, method, error = maybe_install(tool, args, package_manager)
+        install_ok, method, error = maybe_install(tool, args, package_type, package_manager, registry)
         if install_ok:
-            after = detect_tool(tool, path_state)
-            if after["available"]:
-                record["status"] = "available"
-                record["found_in"] = after["found_in"]
-                record["install_method"] = method
-                if after["detected_version"]:
-                    record["detected_version"] = after["detected_version"]
-            else:
-                record["status"] = "install_failed"
-                record["install_method"] = method
-                record["error_message"] = after["error_message"] or "install verification failed"
+            mark_after_install(tool, method, path_state, record)
         else:
             record["status"] = "missing"
-            record["error_message"] = error or detection["error_message"]
+            record["error_message"] = error or str(detection["error_message"])
             if detection.get("found_in"):
                 record["found_in"] = detection["found_in"]
 
     if record["status"] in {"missing", "version_low", "install_failed"}:
         for fallback in tool.get("fallbacks") or []:
-            ok, found_in, binary_name = detect_fallback(fallback, tools_by_name, path_state)
+            ok, found_in, binary_name = detect_fallback(str(fallback), tools_by_name, path_state)
             if ok:
                 if args.auto_fix:
                     allowed, fallback_reason = True, ""
                 else:
-                    allowed, fallback_reason = confirm_fallback(tool["name"], fallback)
+                    allowed, fallback_reason = confirm_fallback(tool["name"], str(fallback))
                 if allowed:
                     record["status"] = "fallback_active"
-                    record["fallback_used"] = fallback
+                    record["fallback_used"] = str(fallback)
                     record["found_in"] = found_in
                     record["error_message"] = f"primary unavailable; using fallback {fallback} ({binary_name})"
                     break
@@ -550,12 +604,13 @@ def compute_decision(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 def main() -> int:
     args = parse_args()
-    registry_path, tools = load_registry(args.registry)
+    package_type = infer_package_type(args)
+    registry_path, registry, tools = load_registry(args.registry)
     out_path = output_path(args)
     print(f"env_check output: {out_path}")
 
     platform = detect_platform()
-    package_manager = detect_pkg_manager(args.package_type)
+    package_manager = detect_pkg_manager(package_type, registry)
     path_warnings: list[str] = []
     path_state = {"path_patched": ensure_local_bin(path_warnings)}
     tools_by_name = {tool["name"]: tool for tool in tools if "name" in tool}
@@ -566,8 +621,8 @@ def main() -> int:
         print("Mode: offline (detect existing tools only; installs are skipped)")
     if args.check_only:
         print("Mode: check-only (installs are skipped)")
-    if args.package_type:
-        print(f"Package type filter: {args.package_type}")
+    if package_type:
+        print(f"Package type filter: {package_type}")
     print(f"Registry: {registry_path}")
 
     records: list[dict[str, Any]] = []
@@ -575,8 +630,8 @@ def main() -> int:
         if "name" not in tool:
             continue
         print(f"[{index}/{len(tools)}] {tool['name']} ({tool.get('priority', 'optional')}) ... ", end="", flush=True)
-        record = make_tool_record(tool, args, platform, package_manager, tools_by_name, path_state)
-        record["_install_hints"] = install_hints(tool, args, package_manager)
+        record = make_tool_record(tool, args, package_type, platform, package_manager, registry, tools_by_name, path_state)
+        record["_install_hints"] = install_hints(tool, args, package_type, package_manager, registry)
         print(record["status"])
         records.append(record)
 
@@ -596,7 +651,7 @@ def main() -> int:
         "package_manager": package_manager,
         "registry_path": str(registry_path),
         "output_path": str(out_path),
-        "package_type": args.package_type,
+        "package_type": package_type,
         "tools": public_records,
         "block_decision": decision["block_decision"],
         "confidence_ceiling": decision["confidence_ceiling"],
