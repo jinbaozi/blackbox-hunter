@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/poc_result.json",
+  "title": "PoC Result Interpretation",
+  "type": "object",
+  "required": ["expected_signal", "runner_result", "decision"],
+  "additionalProperties": false,
+  "properties": {
+    "expected_signal": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {"type": "string", "enum": ["crash", "timeout", "exit_code", "pattern", "unsafe_behavior"]},
+        "pattern": {"type": ["string", "null"]},
+        "exit_code": {"type": ["integer", "null"]},
+        "crash_signal": {"type": ["string", "null"]}
+      }
+    },
+    "runner_result": {
+      "type": "object",
+      "required": ["status", "exit_code", "timeout"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {"type": "string", "enum": ["completed", "failed", "crash", "timeout", "poc_error", "sandbox_error"]},
+        "exit_code": {"type": "integer"},
+        "timeout": {"type": "boolean"},
+        "stdout_path": {"type": "string"},
+        "stderr_path": {"type": "string"},
+        "monitor_path": {"type": ["string", "null"]},
+        "pre_state_path": {"type": ["string", "null"]},
+        "post_state_path": {"type": ["string", "null"]},
+        "result_dir": {"type": ["string", "null"]},
+        "failure_reason": {"type": ["string", "null"]},
+        "crash_signal": {"type": ["string", "null"]}
+      }
+    },
+    "decision": {
+      "type": "object",
+      "required": ["poc_status", "finding_status", "reason", "evidence_paths", "timeout"],
+      "additionalProperties": false,
+      "properties": {
+        "poc_status": {"type": "string", "enum": ["untested", "verified", "failed", "skipped", "inconclusive", "poc_error", "sandbox_error"]},
+        "finding_status": {"type": "string", "enum": ["candidate", "confirmed_static", "verified", "false_positive", "inconclusive"]},
+        "reason": {"type": "string"},
+        "evidence_paths": {"type": "array", "items": {"type": "string"}},
+        "crash_signal": {"type": ["string", "null"]},
+        "timeout": {"type": "boolean"}
+      }
+    }
+  }
+}
