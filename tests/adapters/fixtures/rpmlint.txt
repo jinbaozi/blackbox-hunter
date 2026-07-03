@@ -1,0 +1,2 @@
+demo.x86_64: E: setuid-binary /usr/bin/demo root 4755
+demo.x86_64: W: world-writable-file /var/lib/demo/cache
