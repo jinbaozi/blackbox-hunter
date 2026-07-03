@@ -1,0 +1,11 @@
+{
+  "vulnerabilities": [
+    {
+      "cve": "CVE-2024-12345",
+      "product": "libdemo",
+      "version": "1.0.0",
+      "severity": "high",
+      "path": "/usr/lib/libdemo.so"
+    }
+  ]
+}
