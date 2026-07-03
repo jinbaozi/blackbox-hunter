@@ -8,7 +8,10 @@ mkdir -p "$TMPDIR/fakebin" "$TMPDIR/home" "$TMPDIR/scan"
 
 cat > "$TMPDIR/fakebin/badtool" <<'EOF'
 #!/bin/sh
-exit 0
+case "$1" in
+  --version) echo badtool 1.0; exit 0 ;;
+  *) echo bad detect >&2; exit 7 ;;
+esac
 EOF
 chmod +x "$TMPDIR/fakebin/badtool"
 
