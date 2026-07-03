@@ -14,13 +14,15 @@
   ],
   "offline_mode": false,
   "check_only": true,
+  "package_manager": "dnf",
   "registry_path": "/workspace/blackbox-hunter-skill/tools/tool_registry.json",
   "output_path": "/workspace/BBH-20260627-a1b2c3/env_check.json",
-  "package_type": "deb",
+  "package_type": "rpm",
   "tools": [
     {
       "name": "cve-bin-tool",
       "binary_name": "cve-bin-tool",
+      "execution_model": "host_binary",
       "priority": "required",
       "status": "available",
       "detected_version": "3.2",
@@ -31,6 +33,7 @@
     {
       "name": "checksec",
       "binary_name": "checksec",
+      "execution_model": "host_binary",
       "priority": "required",
       "status": "available",
       "detected_version": "2.7",
@@ -41,6 +44,7 @@
     {
       "name": "ghidra",
       "binary_name": "analyzeHeadless",
+      "execution_model": "host_binary",
       "priority": "medium",
       "status": "fallback_active",
       "fallback_used": "radare2",
@@ -50,9 +54,11 @@
     {
       "name": "lintian",
       "binary_name": "lintian",
+      "execution_model": "host_binary",
       "priority": "high",
       "status": "skipped_not_applicable",
-      "applicable": false
+      "applicable": false,
+      "error_message": "applies_to deb, package-type rpm"
     }
   ],
   "block_decision": {
