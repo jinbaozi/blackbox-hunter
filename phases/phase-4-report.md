@@ -26,10 +26,31 @@ The final report must include conclusions from every previous phase:
 
 - Phase -1: environment readiness, blocked tools, fallback decisions, confidence ceiling, and install hints.
 - Phase 0: package profile, extracted target inventory, architecture coverage, and scan strategy.
-- Phase 1a: deterministic tool coverage, warnings, and Track A finding summary.
+- Phase 1a: deterministic tool coverage, Track A signal counts, warnings, and signal-to-finding promotion summary.
 - Phase 1b: AI analysis dimensions, selected binary-analysis engine, fallback mode, and Track B finding summary.
-- Phase 2: deduplication result, merged finding counts, confidence adjustments, and coverage gaps.
-- Phase 3: verification status, skipped verification reasons, sandbox status, and PoC evidence paths.
+- Phase 2: deduplication result, merged finding counts, lifecycle counts, confidence breakdowns, confidence adjustments, and coverage gaps.
+- Phase 3: verification status, skipped verification reasons, sandbox status, PoC evidence paths, and distinction between runner status and vulnerability verdict.
+
+## Finding Lifecycle Reporting
+
+Reports must group findings by `finding_status` before severity:
+
+1. `verified`
+2. `confirmed_static`
+3. `candidate`
+4. `inconclusive`
+5. `false_positive`
+
+For each finding, show:
+
+- `finding_status`
+- `verification.poc_status`
+- `confidence_breakdown.final`
+- component confidence values: evidence, reachability, tool reliability, verification
+- caps and adjustments from `confidence_breakdown.caps_applied` and `confidence_breakdown.adjustments`
+- supporting signal references, if present
+
+Do not describe `poc_error`, `sandbox_error`, or `inconclusive` as proof that a finding is false. These states must be reported as verification limitations.
 
 ## Output
 
