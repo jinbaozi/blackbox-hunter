@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/finding_signal.json",
+  "title": "BlackBox Hunter Finding Signal",
+  "description": "Weak or intermediate detection signal that may be promoted to a finding only after policy or contextual confirmation.",
+  "type": "object",
+  "required": ["signal_id", "source", "signal_type", "location", "evidence", "promotion"],
+  "additionalProperties": false,
+  "properties": {
+    "signal_id": {"type": "string", "pattern": "^SIG-[AB]-[0-9]{3,}$"},
+    "source": {
+      "type": "object",
+      "required": ["track", "tool"],
+      "additionalProperties": false,
+      "properties": {
+        "track": {"type": "string", "enum": ["A", "B"]},
+        "tool": {"type": "string"}
+      }
+    },
+    "signal_type": {"type": "string"},
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "binary": {"type": "string"},
+        "file": {"type": "string"},
+        "function": {"type": "string"},
+        "address_offset": {"type": "string", "pattern": "^0x[0-9a-fA-F]+$"}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["description", "supporting_files"],
+      "additionalProperties": false,
+      "properties": {
+        "description": {"type": "string", "minLength": 10},
+        "supporting_files": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "promotion": {
+      "type": "object",
+      "required": ["promote_to_finding", "requires_track_b", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "promote_to_finding": {"type": "boolean"},
+        "requires_track_b": {"type": "boolean"},
+        "reason": {"type": "string"}
+      }
+    },
+    "severity_hint": {"type": "string", "enum": ["critical", "high", "medium", "low", "info"]},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "cwe_id": {"type": "string", "pattern": "^CWE-[0-9]+$"},
+    "cve_id": {"type": "string", "pattern": "^CVE-[0-9]{4}-[0-9]+$"},
+    "metadata": {"type": "object", "additionalProperties": true}
+  }
+}

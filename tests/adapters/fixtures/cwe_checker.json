@@ -1,0 +1,10 @@
+{
+  "warnings": [
+    {
+      "cwe": "CWE-120",
+      "binary": "/usr/bin/demo",
+      "address": "0x4012ab",
+      "description": "possible buffer copy issue"
+    }
+  ]
+}

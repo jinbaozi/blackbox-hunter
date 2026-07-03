@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/tool_result.json",
+  "title": "Track A Tool Result",
+  "type": "object",
+  "required": ["tool", "status", "raw_output", "signals", "warnings", "metadata"],
+  "additionalProperties": false,
+  "properties": {
+    "tool": {"type": "string"},
+    "status": {"type": "string", "enum": ["success", "partial", "failed", "skipped"]},
+    "raw_output": {"type": "string"},
+    "signals": {"type": "array", "items": {"$ref": "finding_signal.json"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "metadata": {"type": "object", "additionalProperties": true}
+  }
+}
