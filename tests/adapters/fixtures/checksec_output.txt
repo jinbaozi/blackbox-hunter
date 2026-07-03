@@ -1,0 +1,5 @@
+File: /usr/bin/demo
+RELRO           Partial RELRO
+Canary          No canary found
+NX              NX disabled
+PIE             No PIE
