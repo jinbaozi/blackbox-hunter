@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blackbox-hunter/schemas/confidence_breakdown.json",
+  "title": "Confidence Breakdown",
+  "description": "Structured confidence components used by Phase 2 and reports.",
+  "type": "object",
+  "required": [
+    "evidence",
+    "reachability",
+    "tool_reliability",
+    "verification",
+    "final"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "evidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "reachability": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "tool_reliability": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "verification": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "final": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "caps_applied": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "adjustments": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reason": {
+      "type": "string"
+    }
+  }
+}
