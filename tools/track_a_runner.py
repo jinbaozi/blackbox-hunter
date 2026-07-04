@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 ADAPTERS = {
     "yara": "tools.adapters.yara_scan:YaraAdapter",
     "checksec": "tools.adapters.checksec:ChecksecAdapter",
