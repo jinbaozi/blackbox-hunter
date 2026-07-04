@@ -13,8 +13,9 @@ fi
 
 cat > "$TMPDIR/scan/extracted/usr/bin/unsafe.sh" <<'EOF'
 #!/bin/sh
-# strings intentionally used to trigger YARA rule context
-printf '%s\n' system strcpy sprintf
+# credential context intentionally used to trigger hardcoded_passwords_with_context
+password = "fixture-secret"
+printf '%s\n' system strcpy sprintf "$password"
 EOF
 chmod +x "$TMPDIR/scan/extracted/usr/bin/unsafe.sh"
 
