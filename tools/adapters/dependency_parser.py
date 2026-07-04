@@ -62,7 +62,7 @@ class DependencyParserAdapter:
         output = scan_root / "raw" / "track_a" / "dependencies.json"
         return [
             ToolCommand(
-                argv=["python3", "tools/adapters/dependency_parser.py", str(scan_root / "target_profile.json"), "--emit-raw", "--output", str(output)],
+                argv=["python3", "tools/adapters/dependency_parser.py", str(scan_root / "target_profile.json"), "--emit-raw"],
                 timeout_sec=60,
                 output_path=str(output),
             )
