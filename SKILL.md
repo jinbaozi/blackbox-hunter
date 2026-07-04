@@ -13,22 +13,20 @@ Use this skill when the user wants to scan an rpm or deb package for vulnerabili
 - Optional scan mode: `quick`, `standard`, `deep`, or `full`.
 - Optional resume path pointing to an existing `$WORKSPACE/<scan_id>/scan_state.json`.
 
-## State Machine
+## State Model
+
+`scan_state.json.current_phase` stores the active phase name, while `scan_state.json.phase_status.<phase>.status` stores the phase lifecycle.
+
+Valid `current_phase` values are:
 
 ```text
-idle
-  -> preflight_running
-  -> preflight_done
-  -> phase_0_running
-  -> phase_0_done
-  -> track_a_running + track_b_running
-  -> track_a_done + track_b_done
-  -> phase_2_running
-  -> phase_2_done
-  -> phase_3_running
-  -> phase_3_done
-  -> phase_4_running
-  -> completed
+idle -> preflight -> phase_0 -> track_a/track_b -> phase_2 -> phase_3 -> phase_4 -> completed
+```
+
+Valid phase lifecycle values are:
+
+```text
+pending | running | done | failed | skipped
 ```
 
 Failure states are `failed` at the top level and `failed` or `skipped` per phase. A skipped optional phase must record a reason in `scan_state.json.error_log`.
@@ -45,7 +43,7 @@ Every phase entry in `scan_state.json.phase_status` has `status`, optional times
 
 ## Orchestration
 
-1. Run environment preflight from `phases/phase-preflight.md` to validate tool availability, install missing dependencies, and produce `env_check.json`. If hard-blocked, abort and present installation instructions to the user.
+1. Run environment preflight from `phases/phase-preflight.md` to validate tool availability, install missing dependencies with approval, and produce `env_check.json`. If hard-blocked, abort and present installation instructions to the user.
 2. Load `phases/phase-0-profile.md` and produce `target_profile.json`, `scan_strategy.json`, `coverage_plan.json`, `sandbox_status.json`, and `scan_state.json`.
 3. Run Track A from `phases/phase-1a-toolscan.md` for deterministic tooling.
 4. Run Track B from `phases/phase-1b-ai-analysis.md` for prioritized AI binary analysis.

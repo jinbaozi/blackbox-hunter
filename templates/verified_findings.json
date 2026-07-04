@@ -4,5 +4,21 @@
   "title": "Verified Findings",
   "type": "object",
   "required": ["verified_findings", "verification_stats", "sandbox_info"],
-  "properties": { "verified_findings": { "type": "array", "items": { "type": "object", "properties": { "finding": { "$ref": "finding.json" }, "poc_result": { "type": "object" } } } }, "verification_stats": { "type": "object" }, "sandbox_info": { "$ref": "sandbox_status.json" } }
+  "additionalProperties": false,
+  "properties": {
+    "verified_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["finding", "poc_result"],
+        "additionalProperties": false,
+        "properties": {
+          "finding": {"$ref": "finding.json"},
+          "poc_result": {"type": "object"}
+        }
+      }
+    },
+    "verification_stats": {"type": "object", "additionalProperties": true},
+    "sandbox_info": {"$ref": "sandbox_status.json"}
+  }
 }

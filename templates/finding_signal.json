@@ -7,7 +7,7 @@
   "required": ["signal_id", "source", "signal_type", "location", "evidence", "promotion"],
   "additionalProperties": false,
   "properties": {
-    "signal_id": {"type": "string", "pattern": "^SIG-[AB]-[0-9]{3,}$"},
+    "signal_id": {"type": "string", "pattern": "^SIG-[AB]-([0-9]{3,}|[A-Za-z0-9_.-]+-[0-9a-f]{8}-[0-9]{3,})$"},
     "source": {
       "type": "object",
       "required": ["track", "tool"],

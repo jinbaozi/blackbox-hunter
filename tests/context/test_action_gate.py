@@ -41,6 +41,13 @@ def test_install_requires_approval() -> None:
     assert "install_or_pull_requires_user_approval" in decision.blocked_rules
 
 
+def test_sandbox_image_build_requires_approval() -> None:
+    decision = evaluate_action(ActionRequest(action_type="build_image", phase="phase_3", command=["docker", "build", "sandbox"], requires_network=True))
+    assert decision.allowed is False
+    assert "network_install_requires_approval" in decision.blocked_rules
+    assert "install_or_pull_requires_user_approval" in decision.blocked_rules
+
+
 def test_payload_round_trip() -> None:
     result = evaluate_payload({"action_type": "read_artifact", "phase": "track_b", "command": ["cat", "raw/file.txt"], "requires_network": False, "writes_outside_results": False, "runs_target_code": False, "privileged": False, "in_sandbox": False, "user_approved": False})
     assert result["decision"]["allowed"] is True
@@ -53,6 +60,7 @@ def run_all() -> None:
     test_target_code_outside_sandbox_blocked()
     test_poc_network_blocked_even_with_approval()
     test_install_requires_approval()
+    test_sandbox_image_build_requires_approval()
     test_payload_round_trip()
 
 

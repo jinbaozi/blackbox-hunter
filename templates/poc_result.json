@@ -45,7 +45,8 @@
         "reason": {"type": "string"},
         "evidence_paths": {"type": "array", "items": {"type": "string"}},
         "crash_signal": {"type": ["string", "null"]},
-        "timeout": {"type": "boolean"}
+        "timeout": {"type": "boolean"},
+        "truncated_output": {"type": "boolean"}
       }
     }
   }
