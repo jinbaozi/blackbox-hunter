@@ -50,7 +50,8 @@ EOF
 
 cat > "$TMPDIR/pkg/usr/bin/bbh-full" <<'EOF'
 #!/bin/sh
-printf '%s\n' full-workflow
+printf '%s
+' full-workflow
 EOF
 chmod +x "$TMPDIR/pkg/usr/bin/bbh-full"
 
@@ -76,14 +77,23 @@ test -s "$TMPDIR/workspace/$DEB_SCAN_ID/track_b_findings.json"
 test -s "$TMPDIR/workspace/$DEB_SCAN_ID/merged_findings.json"
 test -s "$TMPDIR/workspace/$DEB_SCAN_ID/verified_findings.json"
 test -s "$TMPDIR/workspace/$DEB_SCAN_ID/report/blackbox-security-report.md"
+grep -q "Preflight Environment Summary" "$TMPDIR/workspace/$DEB_SCAN_ID/report/blackbox-security-report.md"
+grep -q "Track A Summary" "$TMPDIR/workspace/$DEB_SCAN_ID/report/blackbox-security-report.md"
+grep -q "Coverage Gaps" "$TMPDIR/workspace/$DEB_SCAN_ID/report/blackbox-security-report.md"
 
-python3 - "$TMPDIR/workspace/$DEB_SCAN_ID/scan_state.json" <<'PY'
+python3 - "$TMPDIR/workspace/$DEB_SCAN_ID/scan_state.json" "$TMPDIR/workspace/$DEB_SCAN_ID/track_a_findings.json" "$TMPDIR/workspace/$DEB_SCAN_ID/merged_findings.json" <<'PY'
 import json, sys
 state = json.load(open(sys.argv[1], encoding="utf-8"))
+track_a = json.load(open(sys.argv[2], encoding="utf-8"))
+merged = json.load(open(sys.argv[3], encoding="utf-8"))
 assert state["current_phase"] == "completed", state
 for phase in ["preflight", "phase_0", "track_a", "track_b", "phase_2", "phase_4"]:
     assert state["phase_status"][phase]["status"] == "done", (phase, state["phase_status"][phase])
 assert state["phase_status"]["phase_3"]["status"] in {"done", "skipped"}
+assert track_a["status"] == "skipped"
+assert track_a["warnings"], track_a
+assert merged["dedup_stats"]["input_findings"] == 0
+assert "track_a_status" in merged["coverage_summary"]
 PY
 
 cat > "$TMPDIR/bbh-full.rpm" <<'EOF'
@@ -100,6 +110,7 @@ python3 "$ROOT/tools/bbh_scan.py" \
   --allow-synthetic-rpm-fixture >/dev/null
 
 test -s "$TMPDIR/workspace/$RPM_SCAN_ID/report/blackbox-security-report.md"
+grep -q "Target Profile Summary" "$TMPDIR/workspace/$RPM_SCAN_ID/report/blackbox-security-report.md"
 python3 - "$TMPDIR/workspace/$RPM_SCAN_ID/scan_state.json" "$TMPDIR/workspace/$RPM_SCAN_ID/target_profile.json" <<'PY'
 import json, sys
 state = json.load(open(sys.argv[1], encoding="utf-8"))
