@@ -64,7 +64,7 @@ def run_track_a(scan_root: Path, env: dict[str, Any], target_profile: dict[str, 
     executed: list[str] = []
     tool_results: list[str] = []
     warnings: list[str] = []
-    signals_count = 0
+    signals: list[dict[str, Any]] = []
 
     for tool_name in tools_to_consider:
         if tool_name not in allowed:
@@ -89,13 +89,13 @@ def run_track_a(scan_root: Path, env: dict[str, Any], target_profile: dict[str, 
             write_json(result_path, result)
             executed.append(tool_name)
             tool_results.append(str(result_path))
-            signals_count += len(result.get("signals") or [])
+            signals.extend(signal for signal in result.get("signals", []) if isinstance(signal, dict))
 
     payload = {
         "agent_id": "track-a-toolscan",
         "agent_role": "traditional-tooling",
         "phase": "track_a",
-        "status": "success" if not warnings else "partial",
+        "status": "success" if executed and not warnings else ("partial" if executed else "skipped"),
         "findings": [],
         "findings_count": 0,
         "warnings": warnings,
@@ -103,7 +103,8 @@ def run_track_a(scan_root: Path, env: dict[str, Any], target_profile: dict[str, 
         "metadata": {
             "tools_executed": sorted(set(executed)),
             "tool_results": tool_results,
-            "signals_count": signals_count,
+            "signals": signals,
+            "signals_count": len(signals),
             "signals_promoted": 0,
         },
     }
