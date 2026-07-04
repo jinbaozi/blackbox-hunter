@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """Minimal executable BlackBox Hunter workflow runner.
 
-This runner intentionally implements a conservative quick workflow: preflight,
-package profiling, empty Track A/B wrappers when tools are unavailable, merge,
-verification skip/summary, and report generation. It is designed to keep the
-documented state machine executable and schema-valid while richer analyzers are
-incrementally wired in.
+This runner provides a conservative quick workflow: preflight, package
+profiling, optional Track A tool execution, Track B skip wrapper, deterministic
+merge, verification summary, and section-complete report generation.
 """
 from __future__ import annotations
 
@@ -22,6 +20,12 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from tools.merge.merge_runner import merge_findings  # noqa: E402
+from tools.report.report_generator import generate_report, validate_required_sections  # noqa: E402
+from tools.track_a_runner import ADAPTERS as TRACK_A_ADAPTERS, run_track_a  # noqa: E402
+
 PHASES = ["preflight", "phase_0", "track_a", "track_b", "phase_2", "phase_3", "phase_4"]
 CONFIG_SUFFIXES = {".conf", ".cfg", ".ini", ".json", ".yaml", ".yml", ".toml", ".xml"}
 SYSTEMD_DIR_PARTS = {("lib", "systemd", "system"), ("usr", "lib", "systemd", "system")}
@@ -298,27 +302,43 @@ def build_phase0(args: argparse.Namespace, scan_root: Path, package_path: Path, 
     return profile
 
 
-def write_track_outputs(scan_root: Path, env: dict[str, Any]) -> None:
-    warnings = list(env.get("block_decision", {}).get("warnings") or [])
-    track_a = {
+def available_track_a_adapter_names(env: dict[str, Any]) -> list[str]:
+    available = [tool["name"] for tool in env.get("tools", []) if tool.get("status") in {"available", "fallback_active"}]
+    return [name for name in available if name in TRACK_A_ADAPTERS]
+
+
+def write_skipped_track_a(scan_root: Path, reason: str) -> None:
+    write_json(scan_root / "track_a_findings.json", {
         "agent_id": "track-a-toolscan",
         "agent_role": "traditional-tooling",
         "phase": "track_a",
-        "status": "success",
+        "status": "skipped",
         "findings": [],
         "findings_count": 0,
-        "warnings": warnings,
+        "warnings": [reason],
         "execution_time_ms": 0,
         "metadata": {"tools_executed": [], "tool_results": [], "signals_count": 0, "signals_promoted": 0},
-    }
+    })
+
+
+def write_track_outputs(scan_root: Path, env: dict[str, Any], *, run_track_a_tools: bool) -> None:
+    if run_track_a_tools:
+        selected = available_track_a_adapter_names(env)
+        if selected:
+            run_track_a(scan_root, env, load_json(scan_root / "target_profile.json"), selected)
+        else:
+            write_skipped_track_a(scan_root, "Track A tool execution requested but no available Track A adapters were detected")
+    else:
+        write_skipped_track_a(scan_root, "Track A tool execution disabled; use --run-track-a-tools to execute available adapters")
+
     track_b = {
         "agent_id": "track-b-ai",
         "agent_role": "ai-binary-analysis",
         "phase": "track_b",
-        "status": "success",
+        "status": "skipped",
         "findings": [],
         "findings_count": 0,
-        "warnings": [],
+        "warnings": ["Track B agent invocation is not configured in the local runner; prompt/output mapper tests cover this contract"],
         "execution_time_ms": 0,
         "metadata": {
             "dimensions_analyzed": [],
@@ -328,38 +348,38 @@ def write_track_outputs(scan_root: Path, env: dict[str, Any]) -> None:
             "architecture_branch": "strings_only",
         },
     }
-    write_json(scan_root / "track_a_findings.json", track_a)
     write_json(scan_root / "track_b_findings.json", track_b)
 
 
 def write_merge_verify_report(scan_root: Path, sid: str, env: dict[str, Any]) -> None:
-    merged = {
-        "merged_findings": [],
-        "dedup_stats": {"input_findings": 0, "merged_findings": 0},
-        "confidence_scores": {},
-        "lifecycle_stats": {"candidate": 0, "confirmed_static": 0, "false_positive": 0, "inconclusive": 0, "verified": 0},
-        "coverage_summary": {"warnings": env.get("block_decision", {}).get("warnings", [])},
-    }
+    track_a = load_json(scan_root / "track_a_findings.json")
+    track_b = load_json(scan_root / "track_b_findings.json")
+    merged = merge_findings(track_a, track_b)
+    merged.setdefault("coverage_summary", {})["preflight_warnings"] = env.get("block_decision", {}).get("warnings", [])
     write_json(scan_root / "merged_findings.json", merged)
+
+    profile = load_json(scan_root / "target_profile.json")
     coverage = {
-        "binary_coverage_pct": 100,
+        "binary_coverage_pct": 100 if profile.get("binaries") is not None else 0,
         "config_coverage_pct": 100,
         "dependency_coverage_pct": 0,
-        "attack_surface_coverage_pct": 100,
-        "tool_coverage_pct": 0,
+        "attack_surface_coverage_pct": 100 if profile.get("attack_surface") is not None else 0,
+        "tool_coverage_pct": 100 if track_a.get("metadata", {}).get("tools_executed") else 0,
         "gaps": env.get("block_decision", {}).get("phase_blocks", []),
     }
     write_json(scan_root / "coverage_report.json", coverage)
     sandbox = load_json(scan_root / "sandbox_status.json")
     verified = {"verified_findings": [], "verification_stats": {"verified": 0, "skipped": 0}, "sandbox_info": sandbox}
     write_json(scan_root / "verified_findings.json", verified)
+
     report_dir = scan_root / "report"
     report_dir.mkdir(parents=True, exist_ok=True)
-    (report_dir / "blackbox-security-report.md").write_text(
-        f"# BlackBox Security Test Report\n\nscan_id: {sid}\n\nfindings: 0\n\nphase_3_engine: {sandbox.get('engine', 'none')}\n",
-        encoding="utf-8",
-    )
-    write_json(report_dir / "findings.json", {"findings": []})
+    report = generate_report(scan_root)
+    missing = validate_required_sections(report)
+    if missing:
+        raise RuntimeError("report generator missed required sections: " + ", ".join(missing))
+    (report_dir / "blackbox-security-report.md").write_text(report, encoding="utf-8")
+    write_json(report_dir / "findings.json", {"findings": [item["finding"] for item in merged.get("merged_findings", [])]})
 
 
 def parse_args() -> argparse.Namespace:
@@ -370,6 +390,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--registry", default="")
     parser.add_argument("--scan-id", default="")
     parser.add_argument("--allow-synthetic-rpm-fixture", action="store_true")
+    parser.add_argument("--run-track-a-tools", action="store_true", help="Execute available Track A adapters instead of writing a skipped wrapper")
     return parser.parse_args()
 
 
@@ -395,7 +416,7 @@ def main() -> int:
 
         for phase in ("track_a", "track_b"):
             update_phase(state, phase, "running")
-        write_track_outputs(scan_root, env)
+        write_track_outputs(scan_root, env, run_track_a_tools=bool(args.run_track_a_tools))
         update_phase(state, "track_a", "done")
         update_phase(state, "track_b", "done")
 
