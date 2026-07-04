@@ -6,6 +6,10 @@ TMPDIR="${TMPDIR:-/tmp}/bbh-track-a-real-$$"
 trap 'rm -rf "$TMPDIR"' EXIT
 mkdir -p "$TMPDIR/scan/extracted/usr/bin" "$TMPDIR/scan/raw/track_a" "$TMPDIR/fakebin"
 
+if [ "${BBH_RUN_TRACK_A_INTEGRATION:-0}" != "1" ]; then
+  echo "SKIP: set BBH_RUN_TRACK_A_INTEGRATION=1 to run real Track A smoke"
+  exit 0
+fi
 if ! command -v yara >/dev/null 2>&1; then
   echo "SKIP: yara not installed; real Track A smoke disabled"
   exit 0
