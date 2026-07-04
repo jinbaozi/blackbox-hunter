@@ -23,6 +23,9 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 PHASES = ["preflight", "phase_0", "track_a", "track_b", "phase_2", "phase_3", "phase_4"]
+CONFIG_SUFFIXES = {".conf", ".cfg", ".ini", ".json", ".yaml", ".yml", ".toml", ".xml"}
+SYSTEMD_DIR_PARTS = {("lib", "systemd", "system"), ("usr", "lib", "systemd", "system")}
+LIBRARY_SUFFIXES = {".so", ".dylib"}
 
 
 def now_iso() -> str:
@@ -176,6 +179,30 @@ def extract_rpm(package_path: Path, extracted: Path, allow_synthetic: bool) -> t
     return extract_synthetic_rpm_fixture(package_path, extracted, allow_synthetic)
 
 
+def relative_entry(path: Path, extracted: Path) -> str:
+    return "/" + str(path.relative_to(extracted))
+
+
+def path_parts(path: Path, extracted: Path) -> tuple[str, ...]:
+    return tuple(path.relative_to(extracted).parts)
+
+
+def is_systemd_unit(path: Path, extracted: Path) -> bool:
+    parts = path_parts(path, extracted)
+    return path.suffix == ".service" and any(parts[: len(prefix)] == prefix for prefix in SYSTEMD_DIR_PARTS)
+
+
+def is_config_file(path: Path, extracted: Path) -> bool:
+    parts = path_parts(path, extracted)
+    if parts and parts[0] == "etc":
+        return True
+    return path.suffix.lower() in CONFIG_SUFFIXES
+
+
+def is_library_file(path: Path) -> bool:
+    return path.suffix.lower() in LIBRARY_SUFFIXES or ".so." in path.name
+
+
 def collect_inventory(extracted: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
     binaries: list[dict[str, Any]] = []
     attack_surface: list[dict[str, Any]] = []
@@ -183,9 +210,10 @@ def collect_inventory(extracted: Path) -> tuple[list[dict[str, Any]], list[dict[
     for path in sorted(extracted.rglob("*")):
         if not path.is_file():
             continue
-        rel = "/" + str(path.relative_to(extracted))
+        rel = relative_entry(path, extracted)
         mode = path.stat().st_mode
         is_exec = bool(mode & stat.S_IXUSR)
+        is_setuid = bool(mode & stat.S_ISUID)
         is_elf = path.read_bytes()[:4] == b"\x7fELF"
         arch = "unknown"
         if is_elf:
@@ -194,8 +222,15 @@ def collect_inventory(extracted: Path) -> tuple[list[dict[str, Any]], list[dict[
             arch = "script"
         if is_elf or is_exec:
             architectures.add(arch)
-            binaries.append({"path": str(path), "elf": is_elf, "architecture": arch, "priority": 20 if is_exec else 10})
+            priority = 40 if is_setuid else (30 if is_elf else 20)
+            binaries.append({"path": str(path), "elf": is_elf, "architecture": arch, "priority": priority, "setuid": is_setuid})
             attack_surface.append({"type": "cli", "entry_point": rel, "evidence": "executable file in extracted package"})
+        if is_systemd_unit(path, extracted):
+            attack_surface.append({"type": "config", "entry_point": rel, "evidence": "systemd unit may define service entry points and privileges"})
+        elif is_config_file(path, extracted):
+            attack_surface.append({"type": "config", "entry_point": rel, "evidence": "configuration file in extracted package"})
+        elif is_library_file(path):
+            attack_surface.append({"type": "library", "entry_point": rel, "evidence": "shared library entry point"})
     return binaries, attack_surface, sorted(architectures or {"unknown"})
 
 
