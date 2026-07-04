@@ -49,9 +49,10 @@ def mark_phase(state: dict[str, Any], phase: str, status: str, message: str = ""
         entry["started_at"] = now_iso()
     if status in {"done", "failed", "skipped"}:
         entry["completed_at"] = now_iso()
-    if message:
-        entry["error_message"] = message
-        state.setdefault("error_log", []).append({"phase": phase, "status": status, "message": message, "time": now_iso()})
+    if message or status == "failed":
+        safe_message = message or "phase failed without exception message"
+        entry["error_message"] = safe_message
+        state.setdefault("error_log", []).append({"phase": phase, "status": status, "message": safe_message, "time": now_iso()})
     state["phase_status"][phase] = entry
     state["current_phase"] = "failed" if status == "failed" else phase
     state["updated_at"] = now_iso()
@@ -81,7 +82,7 @@ def promote_rerun_output(
         atomic_promote(candidate, destination, validator)
         mark_phase(state, phase, "done")
     except Exception as exc:
-        mark_phase(state, phase, "failed", str(exc))
+        mark_phase(state, phase, "failed", str(exc) or exc.__class__.__name__)
         if state_path:
             write_json(state_path, state)
         raise
