@@ -53,7 +53,10 @@ def run_command(argv: list[str], output_path: Path, timeout: int) -> tuple[int, 
     except subprocess.TimeoutExpired as exc:
         output_path.write_text((exc.stdout or "") + "\nTIMEOUT\n", encoding="utf-8", errors="replace")
         return 124, "timeout"
-    output_path.write_text(result.stdout or "", encoding="utf-8", errors="replace")
+    # Some adapters write their own raw output file. Preserve that file when
+    # stdout is empty; otherwise stdout-based tools still get captured here.
+    if result.stdout or not output_path.exists():
+        output_path.write_text(result.stdout or "", encoding="utf-8", errors="replace")
     return result.returncode, ""
 
 
