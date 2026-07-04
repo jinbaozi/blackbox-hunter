@@ -4,6 +4,7 @@ set -euo pipefail
 python3 -m py_compile \
   tools/preflight.py \
   tools/bbh_scan.py \
+  tools/track_a_runner.py \
   tools/workflow_state.py \
   tools/adapters/base.py \
   tools/adapters/checksec.py \
