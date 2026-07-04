@@ -63,7 +63,16 @@ jobs:
       - name: RPM E2E validation
         run: bash tests/validate_rpm_e2e.sh
 
-      - name: Full workflow validation
+      - name: Full workflow quick validation
+        run: bash tests/e2e/full_workflow_quick.sh
+
+      - name: Full workflow Track B fixture validation
+        run: bash tests/e2e/full_workflow_track_b_fixture.sh
+
+      - name: Full workflow Track A fixture validation
+        run: bash tests/e2e/full_workflow_track_a_fixture.sh
+
+      - name: Full workflow aggregate validation
         run: bash tests/validate_full_workflow.sh
 
       - name: Track B output mapper validation
