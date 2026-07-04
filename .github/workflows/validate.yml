@@ -27,5 +27,68 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install jsonschema
 
-      - name: Run unified validation suite
-        run: bash tests/run_all_tests.sh
+      - name: Schema validation
+        run: bash tests/validate_schemas.sh
+
+      - name: Script and documentation validation
+        run: bash tests/validate_scripts.sh
+
+      - name: YARA rule validation
+        run: bash tests/validate_rules.sh
+
+      - name: Python compile validation
+        run: bash tests/validate_python.sh
+
+      - name: Preflight validation
+        run: bash tests/validate_preflight.sh
+
+      - name: Preflight contract validation
+        run: bash tests/validate_preflight_contracts.sh
+
+      - name: Adapter validation
+        run: bash tests/validate_adapters.sh
+
+      - name: Confidence scoring validation
+        run: bash tests/validate_confidence_scoring.sh
+
+      - name: Action gate and sandbox validation
+        run: bash tests/validate_action_gate_sandbox.sh
+
+      - name: Security regression validation
+        run: bash tests/validate_security_regression.sh
+
+      - name: E2E regression validation
+        run: bash tests/validate_e2e_regression.sh
+
+      - name: RPM E2E validation
+        run: bash tests/validate_rpm_e2e.sh
+
+      - name: Full workflow validation
+        run: bash tests/validate_full_workflow.sh
+
+      - name: Track B output mapper validation
+        run: python3 tests/track_b/test_output_mapper.py
+
+      - name: Merge runner validation
+        run: python3 tests/merge/test_merge_runner.py
+
+      - name: Workflow rerun validation
+        run: python3 tests/workflow/test_resume_rerun.py
+
+      - name: Report generator validation
+        run: python3 tests/report/test_report_generator.py
+
+      - name: Large output interpreter validation
+        run: python3 tests/sandbox/test_result_interpreter_large_output.py
+
+      - name: Non-duplicative aggregate validation
+        run: bash tests/validate_nonduplicate_coverage.sh
+
+      - name: Optional RPM integration validation
+        run: bash tests/validate_integration_rpm.sh
+
+      - name: Optional Track A integration validation
+        run: bash tests/validate_integration_track_a.sh
+
+      - name: Optional sandbox integration validation
+        run: bash tests/validate_integration_sandbox.sh
