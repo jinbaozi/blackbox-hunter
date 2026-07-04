@@ -42,6 +42,10 @@ def imports_from_profile(profile: dict[str, Any]) -> list[str]:
         if isinstance(binary, dict):
             for key in ("imports", "linked_libraries", "libraries", "needed", "dependencies"):
                 _extend_imports(imports, binary.get(key))
+    for surface in profile.get("attack_surface") or []:
+        if isinstance(surface, dict):
+            _extend_imports(imports, surface.get("entry_point"))
+            _extend_imports(imports, surface.get("evidence"))
     seen: set[str] = set()
     deduped: list[str] = []
     for item in imports:
