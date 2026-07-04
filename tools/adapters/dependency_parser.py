@@ -22,12 +22,51 @@ SENSITIVE_IMPORTS = {
 }
 
 
+def _extend_imports(out: list[str], value: Any) -> None:
+    if isinstance(value, str):
+        if value:
+            out.append(value)
+    elif isinstance(value, list):
+        for item in value:
+            _extend_imports(out, item)
+
+
+def imports_from_profile(profile: dict[str, Any]) -> list[str]:
+    imports: list[str] = []
+    metadata = profile.get("metadata") or {}
+    _extend_imports(imports, metadata.get("imports"))
+    _extend_imports(imports, metadata.get("dependencies"))
+    package = profile.get("package") or {}
+    _extend_imports(imports, package.get("dependencies"))
+    for binary in profile.get("binaries") or []:
+        if isinstance(binary, dict):
+            for key in ("imports", "linked_libraries", "libraries", "needed", "dependencies"):
+                _extend_imports(imports, binary.get(key))
+    for surface in profile.get("attack_surface") or []:
+        if isinstance(surface, dict):
+            _extend_imports(imports, surface.get("entry_point"))
+            _extend_imports(imports, surface.get("evidence"))
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for item in imports:
+        if item not in seen:
+            deduped.append(item)
+            seen.add(item)
+    return deduped
+
+
 class DependencyParserAdapter:
     name = "dependency-parser"
 
     def build_commands(self, target_profile: dict[str, Any], scan_root: Path) -> list[ToolCommand]:
         output = scan_root / "raw" / "track_a" / "dependencies.json"
-        return [ToolCommand(argv=["python3", "tools/adapters/dependency_parser.py", str(scan_root / "target_profile.json"), "--output", str(output)], timeout_sec=60, output_path=str(output))]
+        return [
+            ToolCommand(
+                argv=["python3", "tools/adapters/dependency_parser.py", str(scan_root / "target_profile.json"), "--emit-raw", "--output", str(output)],
+                timeout_sec=60,
+                output_path=str(output),
+            )
+        ]
 
     def parse_output(self, raw_path: Path) -> ToolResult:
         data = self._load(raw_path)
@@ -74,14 +113,21 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Normalize dependency/import metadata into finding signals")
     parser.add_argument("raw_output")
     parser.add_argument("--output", default="")
+    parser.add_argument("--emit-raw", action="store_true", help="Extract raw dependency/import metadata from a target_profile.json")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    result = DependencyParserAdapter().parse_output(Path(args.raw_output)).to_json()
-    payload = json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    input_path = Path(args.raw_output)
+    if args.emit_raw:
+        profile = read_json(input_path)
+        payload = json.dumps({"imports": imports_from_profile(profile if isinstance(profile, dict) else {})}, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    else:
+        result = DependencyParserAdapter().parse_output(input_path).to_json()
+        payload = json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if args.output:
+        Path(args.output).parent.mkdir(parents=True, exist_ok=True)
         Path(args.output).write_text(payload, encoding="utf-8")
     else:
         print(payload, end="")
