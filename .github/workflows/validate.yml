@@ -66,7 +66,22 @@ jobs:
       - name: Full workflow validation
         run: bash tests/validate_full_workflow.sh
 
-      - name: Non-duplicative coverage validation
+      - name: Track B output mapper validation
+        run: python3 tests/track_b/test_output_mapper.py
+
+      - name: Merge runner validation
+        run: python3 tests/merge/test_merge_runner.py
+
+      - name: Workflow rerun validation
+        run: python3 tests/workflow/test_resume_rerun.py
+
+      - name: Report generator validation
+        run: python3 tests/report/test_report_generator.py
+
+      - name: Large output interpreter validation
+        run: python3 tests/sandbox/test_result_interpreter_large_output.py
+
+      - name: Non-duplicative aggregate validation
         run: bash tests/validate_nonduplicate_coverage.sh
 
       - name: Optional RPM integration validation
@@ -77,6 +92,3 @@ jobs:
 
       - name: Optional sandbox integration validation
         run: bash tests/validate_integration_sandbox.sh
-
-      - name: Legacy unified local entrypoint
-        run: bash tests/run_all_tests.sh
