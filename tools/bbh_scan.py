@@ -2,8 +2,9 @@
 """Minimal executable BlackBox Hunter workflow runner.
 
 This runner provides a conservative quick workflow: preflight, package
-profiling, optional Track A tool execution, Track B skip wrapper, deterministic
-merge, verification summary, and section-complete report generation.
+profiling, optional Track A tool execution, optional Track B mapped output,
+deterministic merge, verification summary, and section-complete report
+generation.
 """
 from __future__ import annotations
 
@@ -22,6 +23,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from tools.context.track_b_output_mapper import map_text  # noqa: E402
 from tools.merge.merge_runner import merge_findings  # noqa: E402
 from tools.report.report_generator import generate_report, validate_required_sections  # noqa: E402
 from tools.track_a_runner import ADAPTERS as TRACK_A_ADAPTERS, run_track_a  # noqa: E402
@@ -321,8 +323,61 @@ def write_skipped_track_a(scan_root: Path, reason: str) -> None:
     })
 
 
-def write_track_outputs(scan_root: Path, env: dict[str, Any], *, run_track_a_tools: bool) -> None:
-    if run_track_a_tools:
+def write_track_b_from_output(scan_root: Path, args: argparse.Namespace) -> None:
+    source = Path(args.track_b_output).resolve()
+    mapped = map_text(
+        source.read_text(encoding="utf-8"),
+        finding_id=args.track_b_finding_id,
+        dimension=args.track_b_dimension,
+        tool="track-b-ai",
+        agent_id="track-b-ai-local-fixture",
+    )
+    if mapped["status"] == "error":
+        raise RuntimeError("Track B output mapping failed: " + mapped["reason"])
+    findings = [mapped["finding"]] if mapped.get("finding") else []
+    warnings = [] if findings else [mapped.get("reason", "Track B fixture produced no finding")]
+    write_json(scan_root / "track_b_findings.json", {
+        "agent_id": "track-b-ai-local-fixture",
+        "agent_role": "ai-binary-analysis",
+        "phase": "track_b",
+        "status": "success",
+        "findings": findings,
+        "findings_count": len(findings),
+        "warnings": warnings,
+        "execution_time_ms": 0,
+        "metadata": {
+            "dimensions_analyzed": [args.track_b_dimension],
+            "functions_analyzed": 1 if findings else 0,
+            "token_usage": {"mode": args.mode, "tokens_used": 0, "source": "fixture"},
+            "engine_failures": [],
+            "architecture_branch": "fixture_output",
+            "raw_output": str(source),
+        },
+    })
+
+
+def write_skipped_track_b(scan_root: Path, args: argparse.Namespace) -> None:
+    write_json(scan_root / "track_b_findings.json", {
+        "agent_id": "track-b-ai",
+        "agent_role": "ai-binary-analysis",
+        "phase": "track_b",
+        "status": "skipped",
+        "findings": [],
+        "findings_count": 0,
+        "warnings": ["Track B agent invocation is not configured in the local runner; use --track-b-output to map a bounded fixture response"],
+        "execution_time_ms": 0,
+        "metadata": {
+            "dimensions_analyzed": [],
+            "functions_analyzed": 0,
+            "token_usage": {"mode": args.mode, "tokens_used": 0},
+            "engine_failures": [],
+            "architecture_branch": "strings_only",
+        },
+    })
+
+
+def write_track_outputs(scan_root: Path, env: dict[str, Any], args: argparse.Namespace) -> None:
+    if args.run_track_a_tools:
         selected = available_track_a_adapter_names(env)
         if selected:
             run_track_a(scan_root, env, load_json(scan_root / "target_profile.json"), selected)
@@ -331,24 +386,10 @@ def write_track_outputs(scan_root: Path, env: dict[str, Any], *, run_track_a_too
     else:
         write_skipped_track_a(scan_root, "Track A tool execution disabled; use --run-track-a-tools to execute available adapters")
 
-    track_b = {
-        "agent_id": "track-b-ai",
-        "agent_role": "ai-binary-analysis",
-        "phase": "track_b",
-        "status": "skipped",
-        "findings": [],
-        "findings_count": 0,
-        "warnings": ["Track B agent invocation is not configured in the local runner; prompt/output mapper tests cover this contract"],
-        "execution_time_ms": 0,
-        "metadata": {
-            "dimensions_analyzed": [],
-            "functions_analyzed": 0,
-            "token_usage": {"mode": "quick", "tokens_used": 0},
-            "engine_failures": [],
-            "architecture_branch": "strings_only",
-        },
-    }
-    write_json(scan_root / "track_b_findings.json", track_b)
+    if args.track_b_output:
+        write_track_b_from_output(scan_root, args)
+    else:
+        write_skipped_track_b(scan_root, args)
 
 
 def write_merge_verify_report(scan_root: Path, sid: str, env: dict[str, Any]) -> None:
@@ -391,6 +432,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--scan-id", default="")
     parser.add_argument("--allow-synthetic-rpm-fixture", action="store_true")
     parser.add_argument("--run-track-a-tools", action="store_true", help="Execute available Track A adapters instead of writing a skipped wrapper")
+    parser.add_argument("--track-b-output", default="", help="Optional Track B fixture/model JSON output to map into findings")
+    parser.add_argument("--track-b-dimension", default="dangerous_functions")
+    parser.add_argument("--track-b-finding-id", default="TB-001")
     return parser.parse_args()
 
 
@@ -416,7 +460,7 @@ def main() -> int:
 
         for phase in ("track_a", "track_b"):
             update_phase(state, phase, "running")
-        write_track_outputs(scan_root, env, run_track_a_tools=bool(args.run_track_a_tools))
+        write_track_outputs(scan_root, env, args)
         update_phase(state, "track_a", "done")
         update_phase(state, "track_b", "done")
 
