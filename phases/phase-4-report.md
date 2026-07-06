@@ -33,7 +33,7 @@ The final report must include conclusions from every previous phase:
 - Phase 1a: deterministic tool coverage, Track A signal counts, warnings, and signal-to-finding promotion summary.
 - Phase 1b: AI analysis dimensions, selected binary-analysis engine, fallback mode, and Track B finding summary.
 - Phase 2: deduplication result, merged finding counts, lifecycle counts, confidence breakdowns, confidence adjustments, and coverage gaps.
-- Phase 3: verification status, skipped verification reasons, sandbox status, PoC evidence paths, and distinction between runner status and vulnerability verdict.
+- Phase 3: verification status, skipped verification reasons, sandbox status, PoC evidence paths, host-exception invocation summary, and distinction between runner status and vulnerability verdict.
 
 ## Finding Lifecycle Reporting
 

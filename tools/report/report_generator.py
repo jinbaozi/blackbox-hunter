@@ -17,6 +17,7 @@ REQUIRED_SECTION_TITLES = [
     "验证摘要",
     "覆盖缺口",
     "沙箱限制",
+    "主机例外调用摘要",
     "发现项生命周期汇总",
     "附录证据路径",
 ]
@@ -83,6 +84,17 @@ def display_list(values: list[Any] | None, empty: str = "none") -> str:
     return ", ".join(str(value) for value in values)
 
 
+def host_exception_invocations(state: dict[str, Any]) -> list[dict[str, Any]]:
+    invocations = []
+    for item in state.get("error_log") or []:
+        if not isinstance(item, dict):
+            continue
+        if item.get("code") != "host_exception_invoked":
+            continue
+        invocations.append(item)
+    return invocations
+
+
 def generate_report(scan_root: Path) -> str:
     env = read_json(scan_root / "env_check.json")
     profile = read_json(scan_root / "target_profile.json")
@@ -132,6 +144,21 @@ def generate_report(scan_root: Path) -> str:
         "## 沙箱限制",
         f"引擎: {display_value(sandbox.get('engine', 'none'), 'none')}",
         f"限制: {json.dumps(sandbox.get('limitations', []), sort_keys=True)}",
+        "",
+        "## 主机例外调用摘要",
+    ])
+    invocations = host_exception_invocations(state)
+    if invocations:
+        phase_3 = state.get("phase_status", {}).get("phase_3", {})
+        lines.append(f"执行模式: {display_value(phase_3.get('execution_mode'))}")
+        for invocation in invocations:
+            lines.append(
+                f"- 例外 ID: {invocation.get('host_exception_id', display_value('unknown'))}; "
+                f"原因: {invocation.get('reason', display_value('unknown'))}"
+            )
+    else:
+        lines.append("无主机例外调用。")
+    lines.extend([
         "",
         "## 发现项生命周期汇总",
     ])

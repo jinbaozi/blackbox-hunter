@@ -20,7 +20,7 @@ for candidate in docker podman; do
         break
     fi
 done
-[ -n "$ENGINE" ] || { echo "no reachable docker or podman engine"; exit 1; }
+[ -n "$ENGINE" ] || { echo "BLOCKED: no reachable docker or podman engine"; exit 77; }
 
 sha_actual="$(sha256sum "$ROOTFS" | awk '{print $1}')"
 CONTENT_REF="bbh-base:local-${sha_actual:0:12}"

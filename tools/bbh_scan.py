@@ -467,7 +467,7 @@ def write_track_outputs(scan_root: Path, env: dict[str, Any], args: argparse.Nam
         write_skipped_track_b(scan_root, args)
 
 
-def write_merge_verify_report(scan_root: Path, sid: str, env: dict[str, Any]) -> None:
+def write_merge_verify_artifacts(scan_root: Path, sid: str, env: dict[str, Any]) -> None:
     track_a = load_json(scan_root / "track_a_findings.json")
     track_b = load_json(scan_root / "track_b_findings.json")
     merged = merge_findings(track_a, track_b)
@@ -488,6 +488,9 @@ def write_merge_verify_report(scan_root: Path, sid: str, env: dict[str, Any]) ->
     verified = {"verified_findings": [], "verification_stats": {"verified": 0, "skipped": 0}, "sandbox_info": sandbox}
     write_json(scan_root / "verified_findings.json", verified)
 
+
+def write_final_report(scan_root: Path) -> None:
+    merged = load_json(scan_root / "merged_findings.json")
     report_dir = scan_root / "report"
     report_dir.mkdir(parents=True, exist_ok=True)
     report = generate_report(scan_root)
@@ -543,7 +546,7 @@ def main() -> int:
         update_phase(state, "track_b", "done")
 
         update_phase(state, "phase_2", "running")
-        write_merge_verify_report(scan_root, args.scan_id, env)
+        write_merge_verify_artifacts(scan_root, args.scan_id, env)
         update_phase(state, "phase_2", "done")
 
         phase3_blocks = env.get("block_decision", {}).get("phase_blocks") or []
@@ -580,6 +583,8 @@ def main() -> int:
                 state["phase_status"]["phase_3"]["execution_mode"] = "sandbox"
 
         update_phase(state, "phase_4", "done")
+        write_json(scan_root / "scan_state.json", state)
+        write_final_report(scan_root)
         state["current_phase"] = "completed"
         state["updated_at"] = now_iso()
         write_json(scan_root / "scan_state.json", state)

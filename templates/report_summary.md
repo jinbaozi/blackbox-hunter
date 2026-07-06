@@ -36,18 +36,22 @@
 
 汇总 coverage_report.json：二进制、配置、依赖、攻击面和工具覆盖比例，以及缺口和降级原因。
 
-## 10. 范围与环境
+## 10. 主机例外调用摘要
+
+汇总 scan_state.json：Phase 3 是否使用 host_exception execution_mode、host_exception_ref、host_exception_invoked 记录、例外 ID 和调用原因；未调用时明确写明无主机例外调用。
+
+## 11. 范围与环境
 
 说明包路径、包类型、架构覆盖、提取方法、工具版本、沙箱状态和 CVE 数据库模式。
 
-## 11. 发现项
+## 12. 发现项
 
 每个发现项包含严重级别、置信度、受影响二进制或函数、证据、验证状态、修复建议和参考资料。
 
-## 12. 限制与后续步骤
+## 13. 限制与后续步骤
 
 记录缺失工具、不支持的架构、离线数据库时效、跳过的 PoC 验证、未解决覆盖缺口和建议的后续测试。
 
-## 13. 附录 Artifact 路径
+## 14. 附录 Artifact 路径
 
 列出 env_check.json、target_profile.json、scan_strategy.json、coverage_plan.json、track_a_findings.json、track_b_findings.json、merged_findings.json、coverage_report.json、verified_findings.json、scan_state.json、raw logs 和 PoC testcase 路径。artifact 名称、文件路径和技术标识可保持原样。

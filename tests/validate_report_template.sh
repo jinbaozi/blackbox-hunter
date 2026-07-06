@@ -14,7 +14,8 @@ required_sections=(
   "## 7. 合并与置信度摘要"
   "## 8. 验证摘要"
   "## 9. 覆盖摘要"
-  "## 13. 附录 Artifact 路径"
+  "## 10. 主机例外调用摘要"
+  "## 14. 附录 Artifact 路径"
 )
 
 for section in "${required_sections[@]}"; do

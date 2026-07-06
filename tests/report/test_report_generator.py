@@ -40,6 +40,7 @@ def test_report_contains_required_sections() -> None:
         for title in REQUIRED_SECTION_TITLES:
             assert f"## {title}" in report
         assert "## 执行摘要" in report
+        assert "## 主机例外调用摘要" in report
         assert "## 发现项生命周期汇总" in report
         assert "## 附录证据路径" in report
         assert "Executive Summary" not in report
@@ -48,6 +49,33 @@ def test_report_contains_required_sections() -> None:
         assert "yara unavailable" in report
         assert "docker unavailable" in report
         assert str(scan / "merged_findings.json") in report
+
+
+def test_report_lists_host_exception_invocations() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        scan = make_scan_root(Path(td))
+        write(scan / "scan_state.json", {
+            "scan_id": "BBH-20260704-report1",
+            "phase_status": {
+                "phase_3": {
+                    "status": "done",
+                    "execution_mode": "host_exception",
+                    "host_exception_ref": "host-kernel-probe",
+                }
+            },
+            "error_log": [
+                {
+                    "phase": "phase_3",
+                    "code": "host_exception_invoked",
+                    "host_exception_id": "host-kernel-probe",
+                    "reason": "read host kernel counters while PoC stays sandboxed",
+                }
+            ],
+        })
+        report = generate_report(scan)
+        assert "执行模式: host_exception" in report
+        assert "例外 ID: host-kernel-probe" in report
+        assert "原因: read host kernel counters while PoC stays sandboxed" in report
 
 
 def test_missing_section_detector() -> None:
@@ -70,6 +98,7 @@ def test_report_localizes_common_display_values() -> None:
 
 def run_all() -> None:
     test_report_contains_required_sections()
+    test_report_lists_host_exception_invocations()
     test_missing_section_detector()
     test_report_localizes_common_display_values()
 
