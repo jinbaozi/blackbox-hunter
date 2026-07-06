@@ -11,6 +11,9 @@ mkdir -p "$TMPDIR"
 cp "$ROOT/assets/rootfs/v11-2503-rootfs.tar" "$TMPDIR/v11-2503-rootfs.tar"
 sha_actual="$(sha256sum "$TMPDIR/v11-2503-rootfs.tar" | awk '{print $1}')"
 CONTENT_REF="bbh-base:local-${sha_actual:0:12}"
+HAD_STABLE_REF=0
+HAD_CONTENT_REF=0
+STABLE_IMAGE_ID=""
 
 ENGINE=""
 for candidate in docker podman; do
@@ -21,7 +24,26 @@ for candidate in docker podman; do
 done
 [ -n "$ENGINE" ] || { echo "no reachable docker or podman engine"; exit 1; }
 
-trap 'rm -rf "$TMPDIR"; "$ENGINE" rmi -f "$STABLE_REF" "$CONTENT_REF" >/dev/null 2>&1 || true' EXIT
+if "$ENGINE" image inspect "$STABLE_REF" >/dev/null 2>&1; then
+    HAD_STABLE_REF=1
+    STABLE_IMAGE_ID="$($ENGINE image inspect --format '{{.Id}}' "$STABLE_REF")"
+fi
+if "$ENGINE" image inspect "$CONTENT_REF" >/dev/null 2>&1; then
+    HAD_CONTENT_REF=1
+fi
+
+restore() {
+    rm -rf "$TMPDIR"
+    if [ "$HAD_STABLE_REF" -eq 1 ] && [ -n "$STABLE_IMAGE_ID" ]; then
+        "$ENGINE" tag "$STABLE_IMAGE_ID" "$STABLE_REF" >/dev/null 2>&1 || true
+    else
+        "$ENGINE" rmi -f "$STABLE_REF" >/dev/null 2>&1 || true
+    fi
+    if [ "$HAD_CONTENT_REF" -eq 0 ]; then
+        "$ENGINE" rmi -f "$CONTENT_REF" >/dev/null 2>&1 || true
+    fi
+}
+trap restore EXIT
 
 # First import
 python3 "$ROOT/tools/import_rootfs.py" \

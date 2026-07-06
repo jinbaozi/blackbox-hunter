@@ -128,7 +128,23 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def detect_rootfs(repo_root: Path) -> dict[str, str | None]:
+def engine_for_status(engine_status: str) -> str | None:
+    if engine_status == "ready":
+        return "docker"
+    if engine_status == "ready_podman":
+        return "podman"
+    return None
+
+
+def image_exists(engine_status: str, image_ref: str | None) -> bool:
+    engine = engine_for_status(engine_status)
+    if not engine or not image_ref:
+        return False
+    result = run_argv([engine, "image", "inspect", image_ref], timeout=20)
+    return result.returncode == 0
+
+
+def detect_rootfs(repo_root: Path, engine_status: str = "unavailable") -> dict[str, str | None]:
     """Return rootfs_status and imported_image_ref.
 
     Statuses: imported, stale, not_imported, lfs_pointer, missing.
@@ -142,10 +158,13 @@ def detect_rootfs(repo_root: Path) -> dict[str, str | None]:
     if not record.is_file():
         return {"rootfs_status": "not_imported", "imported_image_ref": None}
     rec = json.loads(record.read_text(encoding="utf-8"))
+    stable_ref = rec.get("stable_ref")
     actual_sha = sha256_file(tarball)
-    if rec.get("tarball_sha256") == actual_sha:
-        return {"rootfs_status": "imported", "imported_image_ref": rec.get("stable_ref")}
-    return {"rootfs_status": "stale", "imported_image_ref": rec.get("stable_ref")}
+    if rec.get("tarball_sha256") != actual_sha:
+        return {"rootfs_status": "stale", "imported_image_ref": stable_ref}
+    if not image_exists(engine_status, stable_ref):
+        return {"rootfs_status": "not_imported", "imported_image_ref": stable_ref}
+    return {"rootfs_status": "imported", "imported_image_ref": stable_ref}
 
 
 def detect_engine() -> str:
@@ -698,8 +717,8 @@ def main() -> int:
         records.append(record)
 
     decision = compute_decision(records)
-    rootfs = detect_rootfs(repo_root)
     engine = detect_engine()
+    rootfs = detect_rootfs(repo_root, engine)
     public_records = [
         {key: value for key, value in record.items() if not key.startswith("_") and value not in ("", None, [])}
         for record in records
@@ -735,6 +754,16 @@ def main() -> int:
         if not any("git lfs pull" in warning for warning in report["block_decision"].get("warnings", [])):
             report["block_decision"].setdefault("warnings", []).append(reason_msg)
         print(f"ERROR: {reason_msg}", file=sys.stderr)
+    elif rootfs["rootfs_status"] in ("not_imported", "stale"):
+        reason_msg = "rootfs image is not imported. Run: python3 tools/import_rootfs.py --tarball assets/rootfs/v11-2503-rootfs.tar"
+        if not any("import_rootfs.py" in warning for warning in report["block_decision"].get("warnings", [])):
+            report["block_decision"].setdefault("warnings", []).append(reason_msg)
+        if rootfs.get("imported_image_ref") and not any(block.get("phase") == "phase_3" and block.get("tool") == "rootfs" for block in report["block_decision"].get("phase_blocks", [])):
+            report["block_decision"].setdefault("phase_blocks", []).append({
+                "phase": "phase_3",
+                "tool": "rootfs",
+                "reason": "not_imported",
+            })
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")

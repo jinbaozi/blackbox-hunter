@@ -44,7 +44,7 @@
         "id": {"type": "string"},
         "category": {"type": "string"},
         "reason": {"type": "string", "minLength": 1},
-        "target_is_target_package": {"type": "boolean"}
+        "target_is_target_package": {"const": false}
       }
     }
   }
