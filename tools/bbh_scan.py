@@ -103,6 +103,8 @@ def build_execution_decision(
             "reason": he.get("reason", ""),
             "target_is_target_package": bool(he.get("target_is_target_package", False)),
         },
+        "action_request": action_gate.get("request", {}) if isinstance(action_gate.get("request"), dict) else {},
+        "action_decision": action_gate.get("decision", {}) if isinstance(action_gate.get("decision"), dict) else {},
     }
 
 
@@ -119,7 +121,16 @@ def check_host_exception(decision: dict[str, Any], host_exemptions_path: Path) -
     whitelist = json.loads(host_exemptions_path.read_text(encoding="utf-8"))
     if whitelist.get("schema_version") != 1:
         raise ValueError("host_exemptions.json: unsupported schema_version")
-    exemptions = {e["id"]: e for e in whitelist.get("exemptions", [])}
+
+    exemptions: dict[str, dict[str, Any]] = {}
+    for item in whitelist.get("exemptions", []):
+        if not isinstance(item, dict) or not item.get("id"):
+            raise ValueError("host_exemptions.json: exemption missing id")
+        eid_item = str(item["id"])
+        if eid_item in exemptions:
+            raise ValueError(f"host_exemptions.json: duplicate exemption id {eid_item}")
+        exemptions[eid_item] = item
+
     he = decision.get("host_exception", {})
     eid = he.get("id", "")
     if eid not in exemptions:
@@ -128,8 +139,20 @@ def check_host_exception(decision: dict[str, Any], host_exemptions_path: Path) -
         raise PermissionError("host_exception.reason is required")
     if he.get("target_is_target_package") is True:
         raise PermissionError("C7 violation: target package may not run on host")
-    if exemptions[eid].get("target_is_target_package") is True:
+
+    exemption = exemptions[eid]
+    if exemption.get("target_is_target_package") is True:
         raise PermissionError("C7 violation: whitelist entry has target_is_target_package=true")
+
+    action_decision = decision.get("action_decision", {})
+    if action_decision.get("allowed") is not True:
+        raise PermissionError("host_exception action gate decision is not allowed")
+
+    action_request = decision.get("action_request", {})
+    if exemption.get("requires_user_approval") is True and action_request.get("user_approved") is not True:
+        raise PermissionError("host_exception requires user approval")
+    if action_request.get("runs_target_code") is True:
+        raise PermissionError("C7 violation: host exception may not run target code")
 
 
 def infer_package_type(path: Path) -> str:
@@ -485,6 +508,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--allow-synthetic-rpm-fixture", action="store_true")
     parser.add_argument("--run-track-a-tools", action="store_true", help="Execute available Track A adapters instead of writing a skipped wrapper")
     parser.add_argument("--track-b-output", default="", help="Optional Track B fixture/model JSON output to map into findings")
+    parser.add_argument("--action-gate", default="", help="Optional action gate JSON file for Phase 3 host-exception decisions")
     parser.add_argument("--track-b-dimension", default="dangerous_functions")
     parser.add_argument("--track-b-finding-id", default="TB-001")
     return parser.parse_args()
@@ -498,6 +522,8 @@ def main() -> int:
     scan_root = Path(args.workspace).resolve() / args.scan_id
     scan_root.mkdir(parents=True, exist_ok=True)
     state = initial_state(args.scan_id)
+    if args.action_gate:
+        state["action_gate"] = load_json(Path(args.action_gate).resolve())
     write_json(scan_root / "scan_state.json", state)
 
     try:
@@ -530,25 +556,25 @@ def main() -> int:
                 try:
                     check_host_exception(decision, ROOT / "tools" / "host_exemptions.json")
                 except (PermissionError, ValueError) as gate_err:
-                    update_phase(state, "phase_3", "skipped", str(gate_err))
+                    update_phase(state, "phase_3", "skipped")
+                    state["phase_status"]["phase_3"]["execution_mode"] = "sandbox"
                     state["error_log"].append({
                         "phase": "phase_3",
                         "code": "host_exception_denied",
                         "reason": str(gate_err),
                         "ts": now_iso(),
                     })
-                    write_json(scan_root / "scan_state.json", state)
-                    return 0
-                update_phase(state, "phase_3", "done")
-                state["phase_status"]["phase_3"]["execution_mode"] = "host_exception"
-                state["phase_status"]["phase_3"]["host_exception_ref"] = decision["host_exception"]["id"]
-                state["error_log"].append({
-                    "phase": "phase_3",
-                    "code": "host_exception_invoked",
-                    "host_exception_id": decision["host_exception"]["id"],
-                    "reason": decision["host_exception"]["reason"],
-                    "ts": now_iso(),
-                })
+                else:
+                    update_phase(state, "phase_3", "done")
+                    state["phase_status"]["phase_3"]["execution_mode"] = "host_exception"
+                    state["phase_status"]["phase_3"]["host_exception_ref"] = decision["host_exception"]["id"]
+                    state["error_log"].append({
+                        "phase": "phase_3",
+                        "code": "host_exception_invoked",
+                        "host_exception_id": decision["host_exception"]["id"],
+                        "reason": decision["host_exception"]["reason"],
+                        "ts": now_iso(),
+                    })
             else:
                 update_phase(state, "phase_3", "done")
                 state["phase_status"]["phase_3"]["execution_mode"] = "sandbox"
