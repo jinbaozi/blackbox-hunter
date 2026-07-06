@@ -87,6 +87,23 @@ Install hints are derived from registry `install_priority`, `system_packages`, a
 
 For RPM packages, `rpm2cpio` is the primary extractor and may degrade to `7z` or `bsdtar`. If all required RPM extraction paths are unavailable, Phase 0 must stop before later phases.
 
+## Step 7: Rootfs Tarball Detection
+
+1. Stat `assets/rootfs/v11-2503-rootfs.tar`.
+2. If the file is missing or its size is below 100 KB, treat it as an LFS pointer; hard-block preflight with the message `Run: git lfs pull` in `block_decision.reason` and `block_decision.warnings`.
+3. Compute the tarball's sha256. Compare with `tools/.imported_rootfs.json` if present:
+   - match -> `rootfs_status = imported`
+   - mismatch -> `rootfs_status = stale`; warn
+   - no record -> `rootfs_status = not_imported`; warn
+4. Write `env_check.json.rootfs_status`, `env_check.json.imported_image_ref`.
+
+## Step 8: Container Engine Detection
+
+1. Probe `docker info`; if it returns 0, `engine_status = ready`.
+2. Else probe `podman info`; if it returns 0, `engine_status = ready_podman`.
+3. Else `engine_status = unavailable`; append `{phase: phase_3, tool: docker, reason: missing}` to `block_decision.phase_blocks`.
+4. Write `env_check.json.engine_status`.
+
 ## Outputs
 
 - `$SCAN_ROOT/env_check.json`, validated against `templates/env_check.json`

@@ -62,6 +62,20 @@ Before selecting findings, read `env_check.json.block_decision.phase_blocks`. If
 7. Record stdout, stderr, exit code, timeout status, runner status, crash signals, monitor telemetry, pre/post state, and evidence paths.
 8. Interpret the raw runner result with `sandbox/result_interpreter.py` and the expected verification signal before setting `verification.poc_status`.
 
+## Host Exemption Path (whitelisted)
+
+The default is sandbox. Host execution of any PoC is permitted only when the action gate carries a `host_exception` block whose `id` is in `tools/host_exemptions.json` and whose `target_is_target_package` is `false`. The PoC reproducer itself always runs in the sandbox; the whitelist covers ancillary tooling only (kernel probes, perf/strace on host, debuggers against non-target host processes).
+
+Host exception also requires an allowed action-gate decision, explicit user approval when required by the whitelist, `request.runs_target_code = false`, and explicit `host_exception.target_is_target_package = false`.
+
+When the gate approves host execution:
+
+- `scan_state.json.phase_status.phase_3.execution_mode = "host_exception"`
+- `scan_state.json.phase_status.phase_3.host_exception_ref = <id>`
+- An `error_log` entry is recorded with `code: host_exception_invoked` and the reason.
+
+When the gate denies, the PoC is skipped and `code: host_exception_denied` is recorded.
+
 ## Result Mapping
 
 Use `sandbox/result_interpreter.py` to map runner results into `verification.poc_status`. A raw runner status is not itself a verification decision.
