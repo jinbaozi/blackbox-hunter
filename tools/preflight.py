@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import os
 import re
@@ -15,6 +16,8 @@ from pathlib import Path
 from typing import Any
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+TARBALL_PATH = "assets/rootfs/v11-2503-rootfs.tar"
+LFS_POINTER_THRESHOLD_BYTES = 100 * 1024
 DEFAULT_REGISTRY = SCRIPT_DIR / "tool_registry.json"
 EXTENDED_DIRS = [
     "~/.local/bin",
@@ -115,6 +118,37 @@ def detect_pkg_manager(package_type: str, registry: dict[str, Any]) -> str:
         if shutil.which(PKG_MANAGER_BINARIES.get(name, name)):
             return name
     return "unknown"
+
+
+def detect_rootfs(repo_root: Path) -> dict[str, str | None]:
+    """Return rootfs_status and imported_image_ref.
+
+    Statuses: imported, stale, not_imported, lfs_pointer, missing.
+    """
+    tarball = repo_root / TARBALL_PATH
+    record = repo_root / "tools" / ".imported_rootfs.json"
+    if not tarball.is_file():
+        return {"rootfs_status": "missing", "imported_image_ref": None}
+    if tarball.stat().st_size < LFS_POINTER_THRESHOLD_BYTES:
+        return {"rootfs_status": "lfs_pointer", "imported_image_ref": None}
+    if not record.is_file():
+        return {"rootfs_status": "not_imported", "imported_image_ref": None}
+    rec = json.loads(record.read_text(encoding="utf-8"))
+    actual_sha = hashlib.sha256(tarball.read_bytes()).hexdigest()
+    if rec.get("tarball_sha256") == actual_sha:
+        return {"rootfs_status": "imported", "imported_image_ref": rec.get("stable_ref")}
+    return {"rootfs_status": "stale", "imported_image_ref": rec.get("stable_ref")}
+
+
+def detect_engine() -> str:
+    for engine in ("docker", "podman"):
+        path = shutil.which(engine)
+        if path is None:
+            continue
+        result = subprocess.run([engine, "info"], capture_output=True, text=True, check=False)
+        if result.returncode == 0:
+            return "ready" if engine == "docker" else "ready_podman"
+    return "unavailable"
 
 
 def dedupe(items: list[str]) -> list[str]:
@@ -604,6 +638,7 @@ def compute_decision(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 def main() -> int:
     args = parse_args()
+    repo_root = Path(__file__).resolve().parent.parent
     package_type = infer_package_type(args)
     registry_path, registry, tools = load_registry(args.registry)
     out_path = output_path(args)
@@ -636,6 +671,8 @@ def main() -> int:
         records.append(record)
 
     decision = compute_decision(records)
+    rootfs = detect_rootfs(repo_root)
+    engine = detect_engine()
     public_records = [
         {key: value for key, value in record.items() if not key.startswith("_") and value not in ("", None, [])}
         for record in records
@@ -656,6 +693,27 @@ def main() -> int:
         "block_decision": decision["block_decision"],
         "confidence_ceiling": decision["confidence_ceiling"],
     }
+    report["rootfs_status"] = rootfs["rootfs_status"]
+    report["imported_image_ref"] = rootfs["imported_image_ref"]
+    report["engine_status"] = engine
+
+    if rootfs["rootfs_status"] in ("missing", "lfs_pointer"):
+        report["block_decision"]["blocked"] = True
+        reason_msg = "rootfs tarball is missing or an LFS pointer. Run: git lfs pull"
+        report["block_decision"]["reason"] = reason_msg
+        report["block_decision"]["blocked_tools"] = list(
+            set(report["block_decision"].get("blocked_tools", [])) | {TARBALL_PATH}
+        )
+        if not any("git lfs pull" in warning for warning in report["block_decision"].get("warnings", [])):
+            report["block_decision"].setdefault("warnings", []).append(reason_msg)
+        print(f"ERROR: {reason_msg}", file=sys.stderr)
+
+    if engine == "unavailable":
+        report["block_decision"].setdefault("phase_blocks", []).append({
+            "phase": "phase_3",
+            "tool": "docker",
+            "reason": "missing",
+        })
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
