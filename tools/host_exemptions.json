@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "exemptions": [
+    {
+      "id": "host-kernel-probe",
+      "description": "Read-only access to /proc and /sys/kernel while the PoC reproducer runs in the sandbox.",
+      "category": "kernel_access",
+      "applies_to": ["phase_3"],
+      "target_is_target_package": false,
+      "conditions": [
+        "read-only access to /proc and /sys/kernel",
+        "PoC reproducer itself runs in the sandbox"
+      ],
+      "requires_reason_field": true,
+      "requires_user_approval": true
+    },
+    {
+      "id": "host-perf-profiling",
+      "description": "Run perf or strace -p against a host process while the PoC reproducer runs in the sandbox.",
+      "category": "perf_profiling",
+      "applies_to": ["phase_3"],
+      "target_is_target_package": false,
+      "conditions": [
+        "uses 'perf' or 'strace -p' against a pid outside the PoC container",
+        "PoC reproducer itself runs in the sandbox"
+      ],
+      "requires_reason_field": true,
+      "requires_user_approval": true
+    },
+    {
+      "id": "host-debugger-syscalls",
+      "description": "Run gdb or lldb against a non-target host process required by the PoC reproducer setup.",
+      "category": "debugger_syscalls",
+      "applies_to": ["phase_3"],
+      "target_is_target_package": false,
+      "conditions": [
+        "debugger attaches to a non-target host process",
+        "PoC reproducer itself runs in the sandbox"
+      ],
+      "requires_reason_field": true,
+      "requires_user_approval": true
+    }
+  ]
+}
