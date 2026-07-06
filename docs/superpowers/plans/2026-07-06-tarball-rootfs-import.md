@@ -1021,42 +1021,58 @@ Pick whichever matches the existing surrounding code in the file — both produc
 
 - [ ] **Step 7.4: Wire the gate into Phase 3**
 
-Locate the Phase 3 block (around lines 470–480). The current code does `update_phase(state, "phase_3", "skipped" | "done", ...)`. Add a gate check just before that update. The new logic:
+Locate the Phase 3 block (around lines 470–480). The current code is:
 
 ```python
-        # Host-exemption gate (only triggered when the action gate
-        # explicitly asks for host execution).
-        action_gate = state.get("action_gate", {}) or {}
-        decision = build_execution_decision({}, {}, action_gate)
-        if decision["execution_mode"] == "host_exception":
-            try:
-                check_host_exception(decision, ROOT / "tools" / "host_exemptions.json")
-            except (PermissionError, ValueError) as gate_err:
-                update_phase(state, "phase_3", "skipped", str(gate_err))
-                state["error_log"].append({
-                    "phase": "phase_3",
-                    "code": "host_exception_denied",
-                    "reason": str(gate_err),
-                    "ts": now_iso(),
-                })
-                write_json(scan_root / "scan_state.json", state)
-                return
-            state["phase_status"]["phase_3"]["execution_mode"] = "host_exception"
-            state["phase_status"]["phase_3"]["host_exception_ref"] = decision["host_exception"]["id"]
-            state["error_log"].append({
-                "phase": "phase_3",
-                "code": "host_exception_invoked",
-                "host_exception_id": decision["host_exception"]["id"],
-                "reason": decision["host_exception"]["reason"],
-                "ts": now_iso(),
-            })
-            write_json(scan_root / "scan_state.json", state)
-            # fall through to existing phase_3 done path
+        phase3_blocks = env.get("block_decision", {}).get("phase_blocks") or []
+        if phase3_blocks:
+            update_phase(state, "phase_3", "skipped", "; ".join(block.get("reason", "") for block in phase3_blocks))
         else:
-            state["phase_status"]["phase_3"]["execution_mode"] = "sandbox"
+            update_phase(state, "phase_3", "done")
 ```
 
-Insert this block immediately before the existing `update_phase(state, "phase_3", "skipped", ...)` line. The `state["phase_status"]["phase_3"]["execution_mode"]` write must come **before** the `update_phase(...)` call so that `phase_entry(...)` does not overwrite it — `phase_entry` does not currently set `execution_mode`, so the field is preserved if it's set before the call.
+Replace it with:
+
+```python
+        phase3_blocks = env.get("block_decision", {}).get("phase_blocks") or []
+        if phase3_blocks:
+            update_phase(state, "phase_3", "skipped", "; ".join(block.get("reason", "") for block in phase3_blocks))
+        else:
+            # Host-exemption gate (only triggered when the action gate
+            # explicitly asks for host execution).
+            action_gate = state.get("action_gate", {}) or {}
+            decision = build_execution_decision({}, {}, action_gate)
+            if decision["execution_mode"] == "host_exception":
+                try:
+                    check_host_exception(decision, ROOT / "tools" / "host_exemptions.json")
+                except (PermissionError, ValueError) as gate_err:
+                    update_phase(state, "phase_3", "skipped", str(gate_err))
+                    state["error_log"].append({
+                        "phase": "phase_3",
+                        "code": "host_exception_denied",
+                        "reason": str(gate_err),
+                        "ts": now_iso(),
+                    })
+                    write_json(scan_root / "scan_state.json", state)
+                    return
+                update_phase(state, "phase_3", "done")
+                # Set execution_mode AFTER update_phase because phase_entry
+                # builds a fresh dict that would otherwise wipe it.
+                state["phase_status"]["phase_3"]["execution_mode"] = "host_exception"
+                state["phase_status"]["phase_3"]["host_exception_ref"] = decision["host_exception"]["id"]
+                state["error_log"].append({
+                    "phase": "phase_3",
+                    "code": "host_exception_invoked",
+                    "host_exception_id": decision["host_exception"]["id"],
+                    "reason": decision["host_exception"]["reason"],
+                    "ts": now_iso(),
+                })
+            else:
+                update_phase(state, "phase_3", "done")
+                state["phase_status"]["phase_3"]["execution_mode"] = "sandbox"
+```
+
+The order matters: `update_phase` calls `phase_entry` which returns a brand-new dict, so any `execution_mode` written *before* `update_phase` would be discarded. The fix is to set `execution_mode` and `host_exception_ref` **after** the call.
 
 - [ ] **Step 7.5: Compile-check**
 
@@ -1392,12 +1408,19 @@ For each of these 7 criteria, point to evidence:
    - Evidence: Task 7 (Step 7.4 writes both fields). Manual verification by running T3 and inspecting the output:
    ```bash
    cd /home/godxu/skills/blackbox-hunter
+   bash tests/e2e_rootfs_import/test_poc_runs_in_imported_image.sh
+   # The trap inside T3 wipes $TMPDIR on exit, so re-run T3 with
+   # TMPDIR preserved to inspect the resulting scan_state.json:
+   TMPDIR=/tmp/inspect-t3 bash tests/e2e_rootfs_import/test_poc_runs_in_imported_image.sh
    python3 -c "
-   import json
-   d = json.load(open('tests/e2e_rootfs_import/last_state.json'))  # adjust path
-   print(d['phase_status']['phase_3'].get('execution_mode', 'unset'))
+   import json, glob
+   paths = sorted(glob.glob('/tmp/inspect-t3/workspace/BBH-*/scan_state.json'))
+   d = json.load(open(paths[-1]))
+   print('current_phase:', d['current_phase'])
+   print('execution_mode:', d['phase_status']['phase_3'].get('execution_mode', 'unset'))
    "
    ```
+   Expected (T3 does not exercise host_exception): `current_phase: completed`, `execution_mode: sandbox`.
 7. The final report includes a host-exemption summary when one or more exemptions were invoked.
    - Evidence: existing `tools/report/report_generator.py` is unchanged in this plan, but Task 7's `state["error_log"]` entry is the data source a future report update would consume. Acceptance for the present change is that the data is captured; the report-section update is tracked as future work unless a follow-up plan adds it.
 
@@ -1421,3 +1444,5 @@ Expected: tag `tarball-rootfs-import-v1` is present; the last 15 commits include
 - **Idempotency of import:** Step 2.4's `image_inspect` check + `tag_image` (which is a no-op on the same target) keep re-runs cheap.
 - **C7 invariant:** Enforced in three places: (a) `host_exemptions.json` data (Task 3), (b) `check_host_exception` runtime check (Task 7), (c) `action_gate.json` schema will be enforced at the gate boundary.
 - **One ambiguity in Step 7.3:** I offer two ways to wire `base_image_ref`. The implementer picks whichever fits the surrounding code; both are correct.
+- **Phase 3 ordering fix (post-write):** `update_phase` rebuilds the phase dict from scratch via `phase_entry`, so `execution_mode` and `host_exception_ref` must be set **after** the `update_phase` call, not before. Step 7.4 reflects this.
+- **T3 inspection path (post-write):** T3's `trap` cleans up `$TMPDIR` on exit, so to inspect the resulting `scan_state.json` for evidence on acceptance criterion #6, run T3 with `TMPDIR=/tmp/inspect-t3` set so the directory survives the trap.
