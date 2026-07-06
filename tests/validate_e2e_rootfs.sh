@@ -18,7 +18,7 @@ do
     if [ "$rc" -eq 0 ]; then
         continue
     fi
-    if [ "$rc" -eq 77 ] && [ "$(basename "$t")" = "test_poc_runs_in_imported_image.sh" ]; then
+    if [ "$rc" -eq 77 ] && { [ "$(basename "$t")" = "test_import_rootfs.sh" ] || [ "$(basename "$t")" = "test_poc_runs_in_imported_image.sh" ]; }; then
         echo "  -> $(basename "$t") skipped: missing optional prerequisite"
         continue
     fi

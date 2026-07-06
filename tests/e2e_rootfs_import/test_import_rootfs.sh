@@ -22,7 +22,7 @@ for candidate in docker podman; do
         break
     fi
 done
-[ -n "$ENGINE" ] || { echo "no reachable docker or podman engine"; exit 1; }
+[ -n "$ENGINE" ] || { echo "BLOCKED: no reachable docker or podman engine"; exit 77; }
 
 if "$ENGINE" image inspect "$STABLE_REF" >/dev/null 2>&1; then
     HAD_STABLE_REF=1
