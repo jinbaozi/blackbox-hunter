@@ -38,10 +38,9 @@ def sha256_of(path: Path) -> str:
     return h.hexdigest()
 
 
-def run(cmd: list[str], *, stdin_path: Path | None = None) -> subprocess.CompletedProcess[str]:
+def run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         cmd,
-        stdin=subprocess.PIPE if stdin_path else None,
         capture_output=True,
         text=True,
         check=False,
