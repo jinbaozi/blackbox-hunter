@@ -16,6 +16,15 @@
     "registry_path": {"type": "string"},
     "output_path": {"type": "string"},
     "package_type": {"type": "string", "enum": ["", "deb", "rpm"]},
+    "rootfs_status": {
+      "type": "string",
+      "enum": ["imported", "stale", "not_imported", "lfs_pointer", "missing"]
+    },
+    "imported_image_ref": {"type": ["string", "null"]},
+    "engine_status": {
+      "type": "string",
+      "enum": ["ready", "ready_podman", "unavailable"]
+    },
     "tools": {
       "type": "array",
       "items": {

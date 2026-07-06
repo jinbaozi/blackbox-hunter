@@ -4,5 +4,5 @@
   "title": "Sandbox Status",
   "type": "object",
   "required": ["docker_available", "podman_available", "sandbox_ready", "limitations"],
-  "properties": { "docker_available": { "type": "boolean" }, "podman_available": { "type": "boolean" }, "sandbox_ready": { "type": "boolean" }, "engine_version": { "type": "string" }, "engine": { "type": "string", "enum": ["docker", "podman", "none"] }, "limitations": { "type": "array", "items": { "type": "string" } } }
+  "properties": { "docker_available": { "type": "boolean" }, "podman_available": { "type": "boolean" }, "sandbox_ready": { "type": "boolean" }, "engine_version": { "type": "string" }, "engine": { "type": "string", "enum": ["docker", "podman", "none"] }, "base_image_ref": { "type": "string" }, "base_image_source": { "type": "string", "enum": ["imported_rootfs_tarball", "remote_pull", "prebuilt_local"] }, "limitations": { "type": "array", "items": { "type": "string" } } }
 }

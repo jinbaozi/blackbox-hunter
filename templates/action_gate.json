@@ -35,6 +35,17 @@
         "reason": {"type": "string"},
         "blocked_rules": {"type": "array", "items": {"type": "string"}}
       }
+    },
+    "host_exception": {
+      "type": "object",
+      "required": ["id", "target_is_target_package", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string"},
+        "category": {"type": "string"},
+        "reason": {"type": "string", "minLength": 1},
+        "target_is_target_package": {"type": "boolean"}
+      }
     }
   }
 }

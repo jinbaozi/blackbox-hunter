@@ -7,7 +7,7 @@
   "properties": {
     "scan_id": { "type": "string", "pattern": "^BBH-[0-9]{8}-[a-z0-9]{6}$" },
     "current_phase": { "type": "string", "enum": ["idle", "preflight", "phase_0", "track_a", "track_b", "phase_2", "phase_3", "phase_4", "completed", "failed"] },
-    "phase_status": { "type": "object", "additionalProperties": { "type": "object", "required": ["status"], "properties": { "status": { "type": "string", "enum": ["pending", "running", "done", "failed", "skipped"] }, "started_at": { "type": "string", "format": "date-time" }, "completed_at": { "type": "string", "format": "date-time" }, "error_message": { "type": "string" }, "retry_count": { "type": "integer", "minimum": 0 } } } },
+    "phase_status": { "type": "object", "additionalProperties": { "type": "object", "required": ["status"], "properties": { "status": { "type": "string", "enum": ["pending", "running", "done", "failed", "skipped"] }, "started_at": { "type": "string", "format": "date-time" }, "completed_at": { "type": "string", "format": "date-time" }, "error_message": { "type": "string" }, "retry_count": { "type": "integer", "minimum": 0 }, "execution_mode": { "type": "string", "enum": ["sandbox", "host_exception"] }, "host_exception_ref": { "type": "string" } } } },
     "started_at": { "type": "string", "format": "date-time" },
     "updated_at": { "type": "string", "format": "date-time" },
     "error_log": { "type": "array", "items": { "type": "object" } }
