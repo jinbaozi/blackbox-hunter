@@ -758,7 +758,7 @@ def main() -> int:
         reason_msg = "rootfs image is not imported. Run: python3 tools/import_rootfs.py --tarball assets/rootfs/v11-2503-rootfs.tar"
         if not any("import_rootfs.py" in warning for warning in report["block_decision"].get("warnings", [])):
             report["block_decision"].setdefault("warnings", []).append(reason_msg)
-        if rootfs.get("imported_image_ref") and not any(block.get("phase") == "phase_3" and block.get("tool") == "rootfs" for block in report["block_decision"].get("phase_blocks", [])):
+        if not any(block.get("phase") == "phase_3" and block.get("tool") == "rootfs" for block in report["block_decision"].get("phase_blocks", [])):
             report["block_decision"].setdefault("phase_blocks", []).append({
                 "phase": "phase_3",
                 "tool": "rootfs",

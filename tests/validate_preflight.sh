@@ -111,7 +111,7 @@ assert data["block_decision"]["blocked"] is False
 docker_status = tools["docker"]["status"]
 phase_blocks = data["block_decision"].get("phase_blocks") or []
 if docker_status == "available":
-    assert phase_blocks == []
+    assert not any(block.get("phase") == "phase_3" and block.get("tool") == "docker" for block in phase_blocks)
 else:
     assert any(block.get("phase") == "phase_3" and block.get("tool") == "docker" for block in phase_blocks)
 
