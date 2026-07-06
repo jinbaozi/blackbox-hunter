@@ -110,6 +110,8 @@ assert data["block_decision"]["blocked"] is False
 
 docker_status = tools["docker"]["status"]
 phase_blocks = data["block_decision"].get("phase_blocks") or []
+if data.get("rootfs_status") in {"not_imported", "stale"}:
+    assert any(block.get("phase") == "phase_3" and block.get("tool") == "rootfs" for block in phase_blocks)
 if docker_status == "available":
     assert not any(block.get("phase") == "phase_3" and block.get("tool") == "docker" for block in phase_blocks)
 else:
