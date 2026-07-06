@@ -82,6 +82,56 @@ def update_phase(scan_state: dict[str, Any], phase: str, status: str, error: str
         scan_state["error_log"].append({"phase": phase, "status": status, "message": error, "time": now_iso()})
 
 
+def build_execution_decision(
+    finding: dict[str, Any],
+    sandbox_status: dict[str, Any],
+    action_gate: dict[str, Any],
+) -> dict[str, Any]:
+    """Decide whether a PoC runs in the sandbox or on the host.
+
+    Default: sandbox. A host execution is permitted only when the
+    action gate carries a valid host_exception block.
+    """
+    he = action_gate.get("host_exception") if isinstance(action_gate, dict) else None
+    if not isinstance(he, dict):
+        return {"execution_mode": "sandbox"}
+    return {
+        "execution_mode": "host_exception",
+        "host_exception": {
+            "id": he.get("id", ""),
+            "category": he.get("category", ""),
+            "reason": he.get("reason", ""),
+            "target_is_target_package": bool(he.get("target_is_target_package", False)),
+        },
+    }
+
+
+def check_host_exception(decision: dict[str, Any], host_exemptions_path: Path) -> None:
+    """Validate a host-exception decision against the whitelist.
+
+    Raises ValueError if the whitelist file fails schema validation.
+    Raises PermissionError if the decision is not whitelisted.
+    """
+    if decision.get("execution_mode") != "host_exception":
+        return
+    if not host_exemptions_path.is_file():
+        raise ValueError(f"host_exemptions.json not found: {host_exemptions_path}")
+    whitelist = json.loads(host_exemptions_path.read_text(encoding="utf-8"))
+    if whitelist.get("schema_version") != 1:
+        raise ValueError("host_exemptions.json: unsupported schema_version")
+    exemptions = {e["id"]: e for e in whitelist.get("exemptions", [])}
+    he = decision.get("host_exception", {})
+    eid = he.get("id", "")
+    if eid not in exemptions:
+        raise PermissionError(f"host_exception_id '{eid}' not in whitelist")
+    if not he.get("reason"):
+        raise PermissionError("host_exception.reason is required")
+    if he.get("target_is_target_package") is True:
+        raise PermissionError("C7 violation: target package may not run on host")
+    if exemptions[eid].get("target_is_target_package") is True:
+        raise PermissionError("C7 violation: whitelist entry has target_is_target_package=true")
+
+
 def infer_package_type(path: Path) -> str:
     suffix = path.suffix.lower()
     if suffix == ".deb":
@@ -294,6 +344,8 @@ def build_phase0(args: argparse.Namespace, scan_root: Path, package_path: Path, 
     docker = next((tool for tool in env.get("tools", []) if tool.get("name") == "docker"), {})
     podman = next((tool for tool in env.get("tools", []) if tool.get("name") == "podman"), {})
     sandbox = {
+        "base_image_ref": env.get("imported_image_ref") or "bbh-base:local-imported",
+        "base_image_source": "imported_rootfs_tarball",
         "docker_available": docker.get("status") in {"available", "fallback_active"},
         "podman_available": podman.get("status") in {"available", "fallback_active"},
         "sandbox_ready": docker.get("status") in {"available", "fallback_active"} or podman.get("status") in {"available", "fallback_active"},
@@ -472,7 +524,34 @@ def main() -> int:
         if phase3_blocks:
             update_phase(state, "phase_3", "skipped", "; ".join(block.get("reason", "") for block in phase3_blocks))
         else:
-            update_phase(state, "phase_3", "done")
+            action_gate = state.get("action_gate", {}) or {}
+            decision = build_execution_decision({}, {}, action_gate)
+            if decision["execution_mode"] == "host_exception":
+                try:
+                    check_host_exception(decision, ROOT / "tools" / "host_exemptions.json")
+                except (PermissionError, ValueError) as gate_err:
+                    update_phase(state, "phase_3", "skipped", str(gate_err))
+                    state["error_log"].append({
+                        "phase": "phase_3",
+                        "code": "host_exception_denied",
+                        "reason": str(gate_err),
+                        "ts": now_iso(),
+                    })
+                    write_json(scan_root / "scan_state.json", state)
+                    return 0
+                update_phase(state, "phase_3", "done")
+                state["phase_status"]["phase_3"]["execution_mode"] = "host_exception"
+                state["phase_status"]["phase_3"]["host_exception_ref"] = decision["host_exception"]["id"]
+                state["error_log"].append({
+                    "phase": "phase_3",
+                    "code": "host_exception_invoked",
+                    "host_exception_id": decision["host_exception"]["id"],
+                    "reason": decision["host_exception"]["reason"],
+                    "ts": now_iso(),
+                })
+            else:
+                update_phase(state, "phase_3", "done")
+                state["phase_status"]["phase_3"]["execution_mode"] = "sandbox"
 
         update_phase(state, "phase_4", "done")
         state["current_phase"] = "completed"
