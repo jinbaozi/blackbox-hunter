@@ -101,7 +101,7 @@ def build_execution_decision(
             "id": he.get("id", ""),
             "category": he.get("category", ""),
             "reason": he.get("reason", ""),
-            "target_is_target_package": bool(he.get("target_is_target_package", False)),
+            "target_is_target_package": he.get("target_is_target_package"),
         },
         "action_request": action_gate.get("request", {}) if isinstance(action_gate.get("request"), dict) else {},
         "action_decision": action_gate.get("decision", {}) if isinstance(action_gate.get("decision"), dict) else {},
@@ -137,7 +137,7 @@ def check_host_exception(decision: dict[str, Any], host_exemptions_path: Path) -
         raise PermissionError(f"host_exception_id '{eid}' not in whitelist")
     if not he.get("reason"):
         raise PermissionError("host_exception.reason is required")
-    if he.get("target_is_target_package") is True:
+    if he.get("target_is_target_package") is not False:
         raise PermissionError("C7 violation: target package may not run on host")
 
     exemption = exemptions[eid]
