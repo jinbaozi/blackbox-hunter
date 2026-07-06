@@ -26,7 +26,7 @@ class ActionRequest:
     severity: str | None = None
     requires_network: bool = False
     writes_outside_results: bool = False
-    runs_target_code: bool = False
+    runs_target_code: bool | None = False
     privileged: bool = False
     in_sandbox: bool = False
     user_approved: bool = False
@@ -43,7 +43,7 @@ class ActionRequest:
             severity=(payload.get("severity") or None),
             requires_network=bool(payload.get("requires_network", False)),
             writes_outside_results=bool(payload.get("writes_outside_results", False)),
-            runs_target_code=bool(payload.get("runs_target_code", False)),
+            runs_target_code=payload.get("runs_target_code") if isinstance(payload.get("runs_target_code"), bool) else None,
             privileged=bool(payload.get("privileged", False)),
             in_sandbox=bool(payload.get("in_sandbox", False)),
             user_approved=bool(payload.get("user_approved", False)),
@@ -76,7 +76,9 @@ def evaluate_action(request: ActionRequest) -> GateDecision:
             blocked.append("network_install_requires_approval")
         elif request.action_type not in INSTALL_ACTIONS:
             blocked.append("network_access_blocked")
-    if request.runs_target_code and not request.in_sandbox:
+    if not isinstance(request.runs_target_code, bool):
+        blocked.append("runs_target_code_required")
+    elif request.runs_target_code and not request.in_sandbox:
         blocked.append("target_code_outside_sandbox_blocked")
     if request.action_type == "run_poc":
         if not request.in_sandbox:

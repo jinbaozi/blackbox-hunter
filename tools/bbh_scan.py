@@ -141,7 +141,7 @@ def check_host_exception(decision: dict[str, Any], host_exemptions_path: Path) -
         raise PermissionError("C7 violation: target package may not run on host")
 
     exemption = exemptions[eid]
-    if exemption.get("target_is_target_package") is True:
+    if exemption.get("target_is_target_package") is not False:
         raise PermissionError("C7 violation: whitelist entry has target_is_target_package=true")
 
     action_decision = decision.get("action_decision", {})
