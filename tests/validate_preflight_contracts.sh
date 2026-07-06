@@ -15,6 +15,13 @@ esac
 EOF
 chmod +x "$TMPDIR/fakebin/badtool"
 
+cat > "$TMPDIR/fakebin/nonzero-ok" <<'EOF'
+#!/bin/sh
+echo nonzero-ok 2.1
+exit 9
+EOF
+chmod +x "$TMPDIR/fakebin/nonzero-ok"
+
 cat > "$TMPDIR/fakebin/dnf" <<'EOF'
 #!/bin/sh
 echo dnf fixture
@@ -38,6 +45,18 @@ cat > "$TMPDIR/registry.json" <<'EOF'
       "install_cmds": {"manual": "manual badtool"},
       "detect_cmd": "badtool --definitely-invalid",
       "priority": "required",
+      "fallbacks": [],
+      "platform": ["linux", "darwin"]
+    },
+    {
+      "name": "nonzero-ok",
+      "binary_name": "nonzero-ok",
+      "execution_model": "host_binary",
+      "install_priority": ["manual"],
+      "install_cmds": {"manual": "manual nonzero-ok"},
+      "detect_cmd": "nonzero-ok --probe",
+      "detect_nonzero_ok": true,
+      "priority": "high",
       "fallbacks": [],
       "platform": ["linux", "darwin"]
     },
@@ -79,6 +98,8 @@ tools = {tool["name"]: tool for tool in data["tools"]}
 assert data["package_type"] == "rpm"
 assert data["package_manager"] == "dnf"
 assert tools["badtool"]["status"] == "missing", tools["badtool"]
+assert tools["nonzero-ok"]["status"] == "available", tools["nonzero-ok"]
+assert tools["nonzero-ok"]["detected_version"] == "2.1", tools["nonzero-ok"]
 assert data["block_decision"]["blocked"] is True
 hint = data["block_decision"]["install_hints"][0]
 assert hint.startswith("badtool: "), hint

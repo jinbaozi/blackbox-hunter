@@ -16,3 +16,11 @@
 - Required primary without fallback exits `1` and reports `blocked=true`.
 - First RPM hint uses the RPM-native method instead of apt or pip.
 - Debian package-type tests continue to pass and preserve apt preference when apt is available.
+
+## 2026-07-06 Follow-up Validation
+
+- `TMPDIR=$PWD/.tmp bash tests/validate_preflight_contracts.sh` — passed; verifies default non-zero `detect_cmd` remains missing/hard-blocking and `detect_nonzero_ok: true` reports `nonzero-ok` as available with version `2.1`.
+- `TMPDIR=$PWD/.tmp bash tests/validate_preflight.sh` — passed.
+- `bash tests/validate_schemas.sh` — passed.
+- `git diff --check` — passed.
+- `TMPDIR=$PWD/.tmp bash tests/run_all_tests.sh` — passed; 26 passed, 0 failed.
