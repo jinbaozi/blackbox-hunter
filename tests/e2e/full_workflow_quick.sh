@@ -77,9 +77,9 @@ test -s "$TMPDIR/workspace/$DEB_SCAN_ID/track_b_findings.json"
 test -s "$TMPDIR/workspace/$DEB_SCAN_ID/merged_findings.json"
 test -s "$TMPDIR/workspace/$DEB_SCAN_ID/verified_findings.json"
 test -s "$TMPDIR/workspace/$DEB_SCAN_ID/report/blackbox-security-report.md"
-grep -q "Preflight Environment Summary" "$TMPDIR/workspace/$DEB_SCAN_ID/report/blackbox-security-report.md"
-grep -q "Track A Summary" "$TMPDIR/workspace/$DEB_SCAN_ID/report/blackbox-security-report.md"
-grep -q "Coverage Gaps" "$TMPDIR/workspace/$DEB_SCAN_ID/report/blackbox-security-report.md"
+grep -q "预检环境摘要" "$TMPDIR/workspace/$DEB_SCAN_ID/report/blackbox-security-report.md"
+grep -q "Track A 汇总" "$TMPDIR/workspace/$DEB_SCAN_ID/report/blackbox-security-report.md"
+grep -q "覆盖缺口" "$TMPDIR/workspace/$DEB_SCAN_ID/report/blackbox-security-report.md"
 
 python3 - "$TMPDIR/workspace/$DEB_SCAN_ID/scan_state.json" "$TMPDIR/workspace/$DEB_SCAN_ID/track_a_findings.json" "$TMPDIR/workspace/$DEB_SCAN_ID/merged_findings.json" <<'PY'
 import json, sys
@@ -110,7 +110,7 @@ python3 "$ROOT/tools/bbh_scan.py" \
   --allow-synthetic-rpm-fixture >/dev/null
 
 test -s "$TMPDIR/workspace/$RPM_SCAN_ID/report/blackbox-security-report.md"
-grep -q "Target Profile Summary" "$TMPDIR/workspace/$RPM_SCAN_ID/report/blackbox-security-report.md"
+grep -q "目标画像摘要" "$TMPDIR/workspace/$RPM_SCAN_ID/report/blackbox-security-report.md"
 python3 - "$TMPDIR/workspace/$RPM_SCAN_ID/scan_state.json" "$TMPDIR/workspace/$RPM_SCAN_ID/target_profile.json" <<'PY'
 import json, sys
 state = json.load(open(sys.argv[1], encoding="utf-8"))

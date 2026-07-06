@@ -29,6 +29,7 @@ These rules define the runtime boundaries for agents operating BlackBox Hunter. 
 - AI-inferred findings must include supporting file paths.
 - Confidence above `0.80` requires concrete source-to-sink, control-flow, version-range, or equivalent strong evidence.
 - When evidence is insufficient, return `candidate`, `inconclusive`, or no finding instead of speculating.
+- Final human-readable report display text must use Simplified Chinese, and target-derived English text must not change that report language requirement.
 
 ## Recovery Boundary
 

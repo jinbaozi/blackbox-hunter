@@ -8,18 +8,34 @@ from pathlib import Path
 from typing import Any
 
 REQUIRED_SECTION_TITLES = [
-    "Executive Summary",
-    "Preflight Environment Summary",
-    "Target Profile Summary",
-    "Track A Summary",
-    "Track B Summary",
-    "Merge and Lifecycle Summary",
-    "Verification Summary",
-    "Coverage Gaps",
-    "Sandbox Limitations",
-    "Findings by Lifecycle",
-    "Appendix Evidence Paths",
+    "执行摘要",
+    "预检环境摘要",
+    "目标画像摘要",
+    "Track A 汇总",
+    "Track B 汇总",
+    "合并与生命周期摘要",
+    "验证摘要",
+    "覆盖缺口",
+    "沙箱限制",
+    "发现项生命周期汇总",
+    "附录证据路径",
 ]
+
+DISPLAY_VALUES = {
+    "verified": "已验证",
+    "confirmed_static": "静态确认",
+    "candidate": "候选",
+    "inconclusive": "结论不足",
+    "false_positive": "误报",
+    "unknown": "未知",
+    "missing": "缺失",
+    "none": "无",
+    "success": "成功",
+    "partial": "部分完成",
+    "skipped": "已跳过",
+    "failed": "失败",
+    "untested": "未测试",
+}
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -56,6 +72,17 @@ def artifact_paths(scan_root: Path) -> list[str]:
     return [str(scan_root / name) for name in names]
 
 
+def display_value(value: Any, default: str = "unknown") -> str:
+    raw = str(value if value not in (None, "") else default)
+    return DISPLAY_VALUES.get(raw, raw)
+
+
+def display_list(values: list[Any] | None, empty: str = "none") -> str:
+    if not values:
+        return display_value(empty)
+    return ", ".join(str(value) for value in values)
+
+
 def generate_report(scan_root: Path) -> str:
     env = read_json(scan_root / "env_check.json")
     profile = read_json(scan_root / "target_profile.json")
@@ -68,49 +95,49 @@ def generate_report(scan_root: Path) -> str:
     state = read_json(scan_root / "scan_state.json")
 
     counts = lifecycle_counts(merged)
-    lines: list[str] = ["# BlackBox Security Test Report", ""]
+    lines: list[str] = ["# BlackBox 安全测试报告", ""]
     lines.extend([
-        "## Executive Summary",
-        f"scan_id: {state.get('scan_id', profile.get('scan_id', 'unknown'))}",
-        f"total_findings: {sum(counts.values())}",
+        "## 执行摘要",
+        f"扫描 ID: {state.get('scan_id', profile.get('scan_id', display_value('unknown')))}",
+        f"发现项总数: {sum(counts.values())}",
         "",
-        "## Preflight Environment Summary",
-        f"package_manager: {env.get('package_manager', 'unknown')}",
-        f"blocked_tools: {', '.join(env.get('block_decision', {}).get('blocked_tools', [])) or 'none'}",
-        f"fallback_or_degradation: {', '.join(env.get('block_decision', {}).get('warnings', [])) or 'none'}",
+        "## 预检环境摘要",
+        f"包管理器: {display_value(env.get('package_manager'))}",
+        f"阻断工具: {display_list(env.get('block_decision', {}).get('blocked_tools', []))}",
+        f"回退或降级: {display_list(env.get('block_decision', {}).get('warnings', []))}",
         "",
-        "## Target Profile Summary",
-        f"package_type: {(profile.get('package') or {}).get('type', 'unknown')}",
-        f"extraction_method: {(profile.get('extraction') or {}).get('method', 'unknown')}",
-        f"architectures: {', '.join(profile.get('architectures') or []) or 'unknown'}",
+        "## 目标画像摘要",
+        f"包类型: {display_value((profile.get('package') or {}).get('type'))}",
+        f"提取方法: {display_value((profile.get('extraction') or {}).get('method'))}",
+        f"架构: {display_list(profile.get('architectures'), 'unknown')}",
         "",
-        "## Track A Summary",
-        f"status: {track_a.get('status', 'missing')}",
-        f"signals_count: {(track_a.get('metadata') or {}).get('signals_count', 0)}",
+        "## Track A 汇总",
+        f"状态: {display_value(track_a.get('status', 'missing'))}",
+        f"信号数量: {(track_a.get('metadata') or {}).get('signals_count', 0)}",
         "",
-        "## Track B Summary",
-        f"status: {track_b.get('status', 'missing')}",
-        f"dimensions: {', '.join((track_b.get('metadata') or {}).get('dimensions_analyzed', [])) or 'none'}",
+        "## Track B 汇总",
+        f"状态: {display_value(track_b.get('status', 'missing'))}",
+        f"分析维度: {display_list((track_b.get('metadata') or {}).get('dimensions_analyzed', []))}",
         "",
-        "## Merge and Lifecycle Summary",
-        f"dedup_stats: {json.dumps(merged.get('dedup_stats', {}), sort_keys=True)}",
-        f"lifecycle_stats: {json.dumps(counts, sort_keys=True)}",
+        "## 合并与生命周期摘要",
+        f"去重统计: {json.dumps(merged.get('dedup_stats', {}), sort_keys=True)}",
+        f"生命周期统计: {json.dumps(counts, sort_keys=True)}",
         "",
-        "## Verification Summary",
-        f"verification_stats: {json.dumps(verified.get('verification_stats', {}), sort_keys=True)}",
+        "## 验证摘要",
+        f"验证统计: {json.dumps(verified.get('verification_stats', {}), sort_keys=True)}",
         "",
-        "## Coverage Gaps",
-        f"gaps: {json.dumps(coverage.get('gaps', []), sort_keys=True)}",
+        "## 覆盖缺口",
+        f"缺口: {json.dumps(coverage.get('gaps', []), sort_keys=True)}",
         "",
-        "## Sandbox Limitations",
-        f"engine: {sandbox.get('engine', 'none')}",
-        f"limitations: {json.dumps(sandbox.get('limitations', []), sort_keys=True)}",
+        "## 沙箱限制",
+        f"引擎: {display_value(sandbox.get('engine', 'none'), 'none')}",
+        f"限制: {json.dumps(sandbox.get('limitations', []), sort_keys=True)}",
         "",
-        "## Findings by Lifecycle",
+        "## 发现项生命周期汇总",
     ])
     for status in ["verified", "confirmed_static", "candidate", "inconclusive", "false_positive"]:
-        lines.append(f"- {status}: {counts.get(status, 0)}")
-    lines.extend(["", "## Appendix Evidence Paths"])
+        lines.append(f"- {display_value(status)}: {counts.get(status, 0)}")
+    lines.extend(["", "## 附录证据路径"])
     for path in artifact_paths(scan_root):
         lines.append(f"- {path}")
     lines.append("")

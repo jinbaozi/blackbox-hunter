@@ -34,23 +34,44 @@ def make_scan_root(root: Path) -> Path:
 
 def test_report_contains_required_sections() -> None:
     with tempfile.TemporaryDirectory() as td:
-        report = generate_report(make_scan_root(Path(td)))
+        scan = make_scan_root(Path(td))
+        report = generate_report(scan)
         assert validate_required_sections(report) == []
         for title in REQUIRED_SECTION_TITLES:
             assert f"## {title}" in report
-        assert "package_manager: dnf" in report
+        assert "## 执行摘要" in report
+        assert "## 发现项生命周期汇总" in report
+        assert "## 附录证据路径" in report
+        assert "Executive Summary" not in report
+        assert "Findings by Lifecycle" not in report
+        assert "包管理器: dnf" in report
         assert "yara unavailable" in report
         assert "docker unavailable" in report
+        assert str(scan / "merged_findings.json") in report
 
 
 def test_missing_section_detector() -> None:
-    missing = validate_required_sections("# Report\n\n## Executive Summary\n")
-    assert "Track A Summary" in missing
+    missing = validate_required_sections("# 报告\n\n## 执行摘要\n")
+    assert "Track A 汇总" in missing
+
+
+def test_report_localizes_common_display_values() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        report = generate_report(make_scan_root(Path(td)))
+        assert "- 已验证: 0" in report
+        assert "- 静态确认: 0" in report
+        assert "- 候选: 0" in report
+        assert "- 结论不足: 0" in report
+        assert "- 误报: 0" in report
+        assert "架构: script" in report
+        assert "引擎: 无" in report
+        assert "未知" not in report
 
 
 def run_all() -> None:
     test_report_contains_required_sections()
     test_missing_section_detector()
+    test_report_localizes_common_display_values()
 
 
 if __name__ == "__main__":

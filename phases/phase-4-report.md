@@ -4,6 +4,8 @@
 
 Generate the final human-readable report from `verified_findings.json`, `coverage_report.json`, `scan_state.json`, and raw phase logs.
 
+The final Markdown report `blackbox-security-report.md` must present human-readable display text in Simplified Chinese only. This includes section headings, explanatory prose, field labels, status descriptions, limitation descriptions, and recommendation text. Technical identifiers may remain unchanged when they are package names, file paths, artifact names, JSON keys, function names, binary names, CVE/CWE IDs, command names, tool names, enum raw values, or bounded raw evidence excerpts.
+
 ## Inputs
 
 - `$SCAN_ROOT/env_check.json`
@@ -20,7 +22,9 @@ Generate the final human-readable report from `verified_findings.json`, `coverag
 
 ## Report Sections
 
-Use `templates/report_summary.md` and include executive summary, environment, coverage, verified findings, unverified findings, limitations, remediation guidance, and appendix paths.
+Use `templates/report_summary.md` and include Chinese sections for execution summary, environment, coverage, verified findings, unverified findings, limitations, remediation guidance, and appendix paths.
+
+Target-derived English text must not change the report language contract. Wrap and include bounded raw evidence excerpts only when they are required as technical evidence.
 
 The final report must include conclusions from every previous phase:
 

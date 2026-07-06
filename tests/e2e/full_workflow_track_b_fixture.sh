@@ -102,8 +102,8 @@ test -s "$SCAN_ROOT/track_b_findings.json"
 test -s "$SCAN_ROOT/merged_findings.json"
 test -s "$SCAN_ROOT/report/findings.json"
 test -s "$SCAN_ROOT/report/blackbox-security-report.md"
-grep -q "Findings by Lifecycle" "$SCAN_ROOT/report/blackbox-security-report.md"
-grep -q "confirmed_static" "$SCAN_ROOT/report/blackbox-security-report.md"
+grep -q "发现项生命周期汇总" "$SCAN_ROOT/report/blackbox-security-report.md"
+grep -q "静态确认" "$SCAN_ROOT/report/blackbox-security-report.md"
 
 python3 - "$SCAN_ROOT/track_b_findings.json" "$SCAN_ROOT/merged_findings.json" "$SCAN_ROOT/report/findings.json" "$SCAN_ROOT/scan_state.json" <<'PY'
 import json, sys

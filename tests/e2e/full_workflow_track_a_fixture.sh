@@ -82,8 +82,8 @@ test -s "$SCAN_ROOT/raw/track_a/dependencies.json"
 test -s "$SCAN_ROOT/raw/track_a/normalized/dependency-parser-1.json"
 test -s "$SCAN_ROOT/merged_findings.json"
 test -s "$SCAN_ROOT/report/blackbox-security-report.md"
-grep -q "Track A Summary" "$SCAN_ROOT/report/blackbox-security-report.md"
-grep -q "signals_count:" "$SCAN_ROOT/report/blackbox-security-report.md"
+grep -q "Track A 汇总" "$SCAN_ROOT/report/blackbox-security-report.md"
+grep -q "信号数量:" "$SCAN_ROOT/report/blackbox-security-report.md"
 
 python3 - "$SCAN_ROOT/track_a_findings.json" "$SCAN_ROOT/raw/track_a/dependencies.json" "$SCAN_ROOT/merged_findings.json" "$SCAN_ROOT/scan_state.json" <<'PY'
 import json, sys

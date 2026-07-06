@@ -1,53 +1,53 @@
-# BlackBox Security Test Report
+# BlackBox 安全测试报告
 
-## 1. Executive Summary
+## 1. 执行摘要
 
-Summarize package name, scan_id, scan mode, total findings, verified findings, and highest severity.
+汇总包名、scan_id、扫描模式、发现项总数、已验证发现项数量和最高严重级别。
 
-## 2. Preflight Environment Summary
+## 2. 预检环境摘要
 
-Summarize env_check.json: checked_at, output path, offline/check-only mode, blocked tools, fallback decisions, phase blocks, install hints, path warnings, and confidence ceiling.
+汇总 env_check.json：checked_at、输出路径、离线或仅检查模式、阻断工具、回退决策、阶段阻断、安装提示、路径告警和置信度上限。
 
-## 3. Target Profile Summary
+## 3. 目标画像摘要
 
-Summarize target_profile.json: package path, package type, extracted inventory, binaries, scripts, configs, services, architectures, and attack-surface entry points.
+汇总 target_profile.json：包路径、包类型、提取清单、二进制文件、脚本、配置、服务、架构和攻击面入口。
 
-## 4. Scan Strategy Summary
+## 4. 扫描策略摘要
 
-Summarize scan_strategy.json and coverage_plan.json: mode, selected Track A tools, Track B focus dimensions, target priorities, limits, and expected coverage.
+汇总 scan_strategy.json 和 coverage_plan.json：模式、选定的 Track A 工具、Track B 重点维度、目标优先级、限制和预期覆盖。
 
-## 5. Track A Summary
+## 5. Track A 汇总
 
-Summarize track_a_findings.json: deterministic tools executed, skipped tools, warnings, finding count, and strongest evidence classes.
+汇总 track_a_findings.json：已执行的确定性工具、已跳过工具、告警、发现项数量和最强证据类型。
 
-## 6. Track B Summary
+## 6. Track B 汇总
 
-Summarize track_b_findings.json: binary-analysis engine, fallback mode, dimensions analyzed, functions/files reviewed, warnings, and finding count.
+汇总 track_b_findings.json：二进制分析引擎、回退模式、已分析维度、已审查函数或文件、告警和发现项数量。
 
-## 7. Merge and Confidence Summary
+## 7. 合并与置信度摘要
 
-Summarize merged_findings.json: deduplication decisions, source IDs merged, confidence adjustments, and final finding count.
+汇总 merged_findings.json：去重决策、合并的来源 ID、置信度调整和最终发现项数量。
 
-## 8. Verification Summary
+## 8. 验证摘要
 
-Summarize verified_findings.json and sandbox_status.json: verified findings, unverified findings, skipped PoC reasons, sandbox runtime, and evidence paths.
+汇总 verified_findings.json 和 sandbox_status.json：已验证发现项、未验证发现项、跳过 PoC 的原因、沙箱运行时和证据路径。
 
-## 9. Coverage Summary
+## 9. 覆盖摘要
 
-Summarize coverage_report.json: binary, config, dependency, attack-surface, and tool coverage percentages plus gaps and degradation reasons.
+汇总 coverage_report.json：二进制、配置、依赖、攻击面和工具覆盖比例，以及缺口和降级原因。
 
-## 10. Scope and Environment
+## 10. 范围与环境
 
-Describe package path, package type, architecture coverage, extraction method, tool versions, sandbox status, and CVE database mode.
+说明包路径、包类型、架构覆盖、提取方法、工具版本、沙箱状态和 CVE 数据库模式。
 
-## 11. Findings
+## 11. 发现项
 
-For each finding include severity, confidence, affected binary/function, evidence, verification status, remediation, and references.
+每个发现项包含严重级别、置信度、受影响二进制或函数、证据、验证状态、修复建议和参考资料。
 
-## 12. Limitations and Next Steps
+## 12. 限制与后续步骤
 
-Document missing tools, unsupported architectures, offline database age, skipped PoC verification, unresolved coverage gaps, and recommended follow-up testing.
+记录缺失工具、不支持的架构、离线数据库时效、跳过的 PoC 验证、未解决覆盖缺口和建议的后续测试。
 
-## 13. Appendix Artifact Paths
+## 13. 附录 Artifact 路径
 
-List env_check.json, target_profile.json, scan_strategy.json, coverage_plan.json, track_a_findings.json, track_b_findings.json, merged_findings.json, coverage_report.json, verified_findings.json, scan_state.json, raw logs, and PoC testcase paths.
+列出 env_check.json、target_profile.json、scan_strategy.json、coverage_plan.json、track_a_findings.json、track_b_findings.json、merged_findings.json、coverage_report.json、verified_findings.json、scan_state.json、raw logs 和 PoC testcase 路径。artifact 名称、文件路径和技术标识可保持原样。

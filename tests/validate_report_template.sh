@@ -6,15 +6,15 @@ TEMPLATE="$ROOT/templates/report_summary.md"
 PHASE="$ROOT/phases/phase-4-report.md"
 
 required_sections=(
-  "## 2. Preflight Environment Summary"
-  "## 3. Target Profile Summary"
-  "## 4. Scan Strategy Summary"
-  "## 5. Track A Summary"
-  "## 6. Track B Summary"
-  "## 7. Merge and Confidence Summary"
-  "## 8. Verification Summary"
-  "## 9. Coverage Summary"
-  "## 13. Appendix Artifact Paths"
+  "## 2. 预检环境摘要"
+  "## 3. 目标画像摘要"
+  "## 4. 扫描策略摘要"
+  "## 5. Track A 汇总"
+  "## 6. Track B 汇总"
+  "## 7. 合并与置信度摘要"
+  "## 8. 验证摘要"
+  "## 9. 覆盖摘要"
+  "## 13. 附录 Artifact 路径"
 )
 
 for section in "${required_sections[@]}"; do
