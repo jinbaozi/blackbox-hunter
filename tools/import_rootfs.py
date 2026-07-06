@@ -138,7 +138,7 @@ def main() -> None:
 
     tag_image(engine, target_ref, stable_ref)
     if not image_inspect(engine, stable_ref):
-        print(f"ERROR: tag step failed: {stable_ref} not visible after docker tag", file=sys.stderr)
+        print(f"ERROR: tag step failed: {stable_ref} not visible after {engine} tag", file=sys.stderr)
         sys.exit(7)
 
     write_record(args.record_path, tarball_sha=sha, image_ref=target_ref, stable_ref=stable_ref)

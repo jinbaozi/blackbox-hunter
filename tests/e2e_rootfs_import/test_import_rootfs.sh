@@ -32,7 +32,7 @@ python3 "$ROOT/tools/import_rootfs.py" \
 "$ENGINE" image inspect "$STABLE_REF" >/dev/null
 
 test -f "$RECORD"
-sha_in_record="$(python3 -c "import json,sys;print(json.load(open('$RECORD'))['tarball_sha256'])")"
+sha_in_record="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['tarball_sha256'])" "$RECORD")"
 [ "$sha_in_record" = "$sha_actual" ]
 
 # Idempotent re-run
