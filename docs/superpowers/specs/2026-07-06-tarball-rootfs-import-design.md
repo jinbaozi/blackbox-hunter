@@ -76,12 +76,15 @@ python3 tools/import_rootfs.py \
   1. Compute sha256 of tarball
   2. Compute short-sha = first-12-chars(sha256)
   3. target_ref = "bbh-base:local-<short-sha>"
-  4. If "docker image inspect <target_ref>" succeeds → no-op, exit 0
-  5. Else run "docker import - <target_ref>" < tarball
-  6. "docker tag <target_ref> bbh-base:local-imported"
-  7. Write tools/.imported_rootfs.json
+  4. If "docker image inspect <target_ref>" fails:
+       run "docker import - <target_ref>" < tarball
+  5. Run "docker tag <target_ref> bbh-base:local-imported"
+     (idempotent: re-tagging to the same target_ref is a no-op the second time)
+  6. Write tools/.imported_rootfs.json
      { "tarball_sha256", "image_ref", "stable_ref",
        "imported_at": "<ISO-8601 UTC>" }
+  7. If "docker image inspect bbh-base:local-imported" fails after step 5,
+     abort with non-zero exit and message "tag step failed".
 ```
 
 ### 4.2 Per-scan flow (only the changed parts)
@@ -120,12 +123,34 @@ for each candidate finding:
       assert exemption.target_is_target_package == false   (schema-level)
       assert decision.host_exception.reason non-empty
       assert decision.host_exception.target_is_target_package == false
-      run the same run_poc.sh wrapper, on the host
+      run sandbox/run_poc.sh on the host, with the same POC_SCRIPT,
+        TIMEOUT, OUTPUT_DIR, MONITOR_INTERVAL, and result file contract
+        (stdout.txt, stderr.txt, exit_code.txt, timeout.txt, status.txt)
+        as the in-container invocation. Path mapping is implemented by
+        the orchestrator: /poc, /pkg, /workspace/results are bind-mounted
+        to host temp dirs whose paths are passed via the same env vars.
       record scan_state.phase_status.phase_3.execution_mode = "host_exception"
       record scan_state.phase_status.phase_3.host_exception_ref = id
       append scan_state.error_log entry { phase, code, host_exception_id, reason, ts }
   else:
       action gate returns "deny" → skip PoC + record error_log entry
+
+Function contracts (new helpers in tools/bbh_scan.py):
+
+  build_execution_decision(finding, sandbox_status, action_gate) -> dict
+    Returns: { execution_mode: "sandbox" | "host_exception" | "deny",
+               host_exception?: { id, category, reason, target_is_target_package } }
+    Logic:  default to "sandbox"; only return "host_exception" if the
+            action gate explicitly carries a valid host_exception block.
+
+  check_host_exception(decision, host_exemptions_path) -> None (raises on failure)
+    Raises PermissionError if:
+      - decision.execution_mode == "host_exception" AND
+      - id not in host_exemptions.json OR
+      - reason is empty OR
+      - target_is_target_package is true
+    Schema validation of host_exemptions.json is performed first;
+    schema failure → raise ValueError before any per-decision check.
 ```
 
 **Phase 4 (report):** adds a section listing every `execution_mode == host_exception` invocation in this scan, with the exemption ID and reason.
@@ -154,7 +179,7 @@ Add top-level properties:
 }
 ```
 
-Remove `additionalProperties: false` on the top level OR add these to the allowed list. (Resolve during implementation.)
+Add these to the top-level `properties` of `templates/env_check.json`; do not remove `additionalProperties: false`. The new fields are required when produced by a post-change preflight, and optional otherwise (writeback must include them).
 
 ### 5.2 `templates/sandbox_status.json`
 
@@ -312,7 +337,7 @@ Total expected CI cost: ~3 minutes added.
 
 1. **First-time pull is heavy.** Cloning the repo with LFS pulls 957 MB. This is unavoidable given the chosen base; document it in the README and in the failure message.
 2. **Docker daemon dependency.** Anyone running this needs a working docker (or podman) daemon. The Phase 3 phase-block handles this gracefully.
-3. **`Dockerfile.poc` no longer runs `apt-get install`.** Anything the existing Dockerfile installed on top of `ubuntu:22.04` must already exist in the v11-2503 rootfs. If a needed tool is missing, the fix is to amend the v11-2503 rootfs upstream, not to add an `apt-get install` line back into `Dockerfile.poc`. (Otherwise we re-introduce network dependency at build time.)
+3. **`Dockerfile.poc` no longer runs `apt-get install`.** Anything the existing Dockerfile installed on top of `ubuntu:22.04` must already exist in the v11-2503 rootfs. If a needed tool is missing, the fix is to rebuild the v11-2503 rootfs at its source (the place that produced `v11-2503-rootfs.tar`) and re-publish the tarball, then re-run `import_rootfs.py` — **not** to add an `apt-get install` line back into `Dockerfile.poc`. Re-introducing that line would re-create a network dependency at build time and re-introduce the debian-derivative base the migration is meant to remove.
 4. **The whitelist may grow.** Adding a new exemption is a schema-validated edit to `tools/host_exemptions.json`. The schema-level `const: false` on `target_is_target_package` makes that the only safety-critical field; review should focus there.
 
 ## 9. Acceptance Criteria
