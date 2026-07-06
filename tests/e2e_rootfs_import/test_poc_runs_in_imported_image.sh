@@ -4,7 +4,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMPDIR="${TMPDIR:-/tmp}/bbh-t3-$$"
-SCAN_ID="t3-imported-image"
+SCAN_ID="BBH-20260706-t3$(printf '%04d' $(( $$ % 10000 )))"
 SCAN_ROOT="$TMPDIR/workspace/$SCAN_ID"
 ROOTFS="$ROOT/assets/rootfs/v11-2503-rootfs.tar"
 RECORD="$ROOT/tools/.imported_rootfs.json"
