@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMPDIR="${TMPDIR:-/tmp}/bbh-t1-$$"
 STABLE_REF="bbh-base:local-imported"
-RECORD="$ROOT/tools/.imported_rootfs.json"
+RECORD="$TMPDIR/imported_rootfs.json"
 
 mkdir -p "$TMPDIR"
 cp "$ROOT/assets/rootfs/v11-2503-rootfs.tar" "$TMPDIR/v11-2503-rootfs.tar"
@@ -21,7 +21,7 @@ for candidate in docker podman; do
 done
 [ -n "$ENGINE" ] || { echo "no reachable docker or podman engine"; exit 1; }
 
-trap 'rm -rf "$TMPDIR"; "$ENGINE" rmi -f "$STABLE_REF" "$CONTENT_REF" >/dev/null 2>&1 || true; rm -f "$RECORD"' EXIT
+trap 'rm -rf "$TMPDIR"; "$ENGINE" rmi -f "$STABLE_REF" "$CONTENT_REF" >/dev/null 2>&1 || true' EXIT
 
 # First import
 python3 "$ROOT/tools/import_rootfs.py" \
