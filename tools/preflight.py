@@ -120,6 +120,14 @@ def detect_pkg_manager(package_type: str, registry: dict[str, Any]) -> str:
     return "unknown"
 
 
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def detect_rootfs(repo_root: Path) -> dict[str, str | None]:
     """Return rootfs_status and imported_image_ref.
 
@@ -134,7 +142,7 @@ def detect_rootfs(repo_root: Path) -> dict[str, str | None]:
     if not record.is_file():
         return {"rootfs_status": "not_imported", "imported_image_ref": None}
     rec = json.loads(record.read_text(encoding="utf-8"))
-    actual_sha = hashlib.sha256(tarball.read_bytes()).hexdigest()
+    actual_sha = sha256_file(tarball)
     if rec.get("tarball_sha256") == actual_sha:
         return {"rootfs_status": "imported", "imported_image_ref": rec.get("stable_ref")}
     return {"rootfs_status": "stale", "imported_image_ref": rec.get("stable_ref")}
@@ -145,10 +153,29 @@ def detect_engine() -> str:
         path = shutil.which(engine)
         if path is None:
             continue
-        result = subprocess.run([engine, "info"], capture_output=True, text=True, check=False)
+        result = run_argv([engine, "info"], timeout=20)
         if result.returncode == 0:
             return "ready" if engine == "docker" else "ready_podman"
     return "unavailable"
+
+
+def reconcile_engine_phase_blocks(block_decision: dict[str, Any], engine: str) -> None:
+    phase_blocks = block_decision.setdefault("phase_blocks", [])
+    if engine in ("ready", "ready_podman"):
+        phase_blocks[:] = [
+            block for block in phase_blocks
+            if not (block.get("phase") == "phase_3" and block.get("tool") in {"docker", "podman"})
+        ]
+        if not block_decision.get("blocked") and not phase_blocks:
+            block_decision["reason"] = ""
+        return
+
+    if not any(block.get("phase") == "phase_3" and block.get("tool") == "docker" for block in phase_blocks):
+        phase_blocks.append({
+            "phase": "phase_3",
+            "tool": "docker",
+            "reason": "missing",
+        })
 
 
 def dedupe(items: list[str]) -> list[str]:
@@ -696,6 +723,7 @@ def main() -> int:
     report["rootfs_status"] = rootfs["rootfs_status"]
     report["imported_image_ref"] = rootfs["imported_image_ref"]
     report["engine_status"] = engine
+    reconcile_engine_phase_blocks(report["block_decision"], engine)
 
     if rootfs["rootfs_status"] in ("missing", "lfs_pointer"):
         report["block_decision"]["blocked"] = True
@@ -707,13 +735,6 @@ def main() -> int:
         if not any("git lfs pull" in warning for warning in report["block_decision"].get("warnings", [])):
             report["block_decision"].setdefault("warnings", []).append(reason_msg)
         print(f"ERROR: {reason_msg}", file=sys.stderr)
-
-    if engine == "unavailable":
-        report["block_decision"].setdefault("phase_blocks", []).append({
-            "phase": "phase_3",
-            "tool": "docker",
-            "reason": "missing",
-        })
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")

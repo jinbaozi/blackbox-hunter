@@ -6,10 +6,16 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMPDIR="${TMPDIR:-/tmp}/bbh-t2-$$"
 SCAN_ROOT="$TMPDIR/scan"
 ORIG="$ROOT/assets/rootfs/v11-2503-rootfs.tar"
-BACKUP="$TMPDIR/orig.tar"
+BACKUP="$ORIG.bak.$$"
 mkdir -p "$TMPDIR"
-cp "$ORIG" "$BACKUP"
-trap 'cp "$BACKUP" "$ORIG"; rm -rf "$TMPDIR"' EXIT
+mv "$ORIG" "$BACKUP"
+restore() {
+    if [ -f "$BACKUP" ]; then
+        mv "$BACKUP" "$ORIG"
+    fi
+    rm -rf "$TMPDIR"
+}
+trap restore EXIT
 
 # Truncate to simulate an LFS pointer
 : > "$ORIG"
