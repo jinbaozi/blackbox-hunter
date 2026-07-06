@@ -11,7 +11,18 @@ for t in \
     "$E2E_DIR/test_poc_runs_in_imported_image.sh"
 do
     echo "  -> $(basename "$t")"
+    set +e
     bash "$t"
+    rc=$?
+    set -e
+    if [ "$rc" -eq 0 ]; then
+        continue
+    fi
+    if [ "$rc" -eq 77 ] && [ "$(basename "$t")" = "test_poc_runs_in_imported_image.sh" ]; then
+        echo "  -> $(basename "$t") skipped: missing optional prerequisite"
+        continue
+    fi
+    exit "$rc"
 done
 
 echo "E2E rootfs validation passed."
