@@ -151,7 +151,7 @@ def check_host_exception(decision: dict[str, Any], host_exemptions_path: Path) -
     action_request = decision.get("action_request", {})
     if exemption.get("requires_user_approval") is True and action_request.get("user_approved") is not True:
         raise PermissionError("host_exception requires user approval")
-    if action_request.get("runs_target_code") is True:
+    if action_request.get("runs_target_code") is not False:
         raise PermissionError("C7 violation: host exception may not run target code")
 
 
