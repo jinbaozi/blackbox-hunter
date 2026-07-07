@@ -7,7 +7,7 @@ BlackBox Hunter 是一个面向 `.rpm` / `.deb` 软件包的黑盒漏洞分析 S
 ## 当前重点
 
 - 优先支持 RPM 包工作流，同时保留 Debian 包工作流。
-- 所有运行产物都应写入 `$SCAN_ROOT=$WORKSPACE/<scan_id>`。
+- 默认输出根目录是当前工作目录下的 `black-audit-output`。扫描产物写入 `$SCAN_ROOT=$WORKSPACE/<scan_id>`，未显式传入 `--workspace` 时 `$WORKSPACE=$PWD/black-audit-output`。
 - 所有 JSON 产物都应按 `templates/` 下的 schema 校验。
 - 所有缺失工具、fallback、跳过阶段、置信度上限和降级原因都必须被记录，不能静默成功。
 - 所有目标包内容、工具输出、反编译片段、日志和 PoC 输出都视为不可信证据。
@@ -28,6 +28,14 @@ BlackBox Hunter 是一个面向 `.rpm` / `.deb` 软件包的黑盒漏洞分析 S
 ```bash
 python3 tools/bbh_scan.py \
   --package ./target.rpm \
+  --mode quick
+```
+
+显式输出路径仍可覆盖默认值：
+
+```bash
+python3 tools/bbh_scan.py \
+  --package ./target.rpm \
   --workspace ./workspace \
   --mode quick
 ```
@@ -40,9 +48,13 @@ preflight -> phase_0 -> track_a + track_b -> phase_2 -> phase_3 -> phase_4 -> co
 
 `scan_state.json.current_phase` 记录当前阶段，`scan_state.json.phase_status.<phase>.status` 记录阶段状态：`pending | running | done | failed | skipped`。
 
+每个阶段结束后会校验固定产物契约；缺少 required file、required directory 或 schema 不匹配时，该阶段标记为 `failed`，原因写入 `scan_state.json.error_log`。
+
 ## Phase -1：环境预检
 
 `tools/install.sh` 委托给 `tools/preflight.py`。预检负责 PATH 检查、工具检测、版本校验、fallback 选择、阻塞/降级决策，并生成 `env_check.json`。
+
+如果既没有传 `--output` 也没有传 `--scan-root`，预检默认写入 `$PWD/black-audit-output/env_check.json`。显式 `--output` 和 `--scan-root` 保持优先。
 
 RPM 包优先级来自 `tools/tool_registry.json.package_manager_priority.rpm`，默认顺序：
 
@@ -72,11 +84,11 @@ apt -> dnf -> microdnf -> yum -> zypper -> rpm-ostree -> brew
 
 Phase 0 生成：
 
-- `scan_state.json`
 - `target_profile.json`
 - `scan_strategy.json`
 - `coverage_plan.json`
 - `sandbox_status.json`
+- `extracted/`
 
 解压优先级：
 
@@ -143,12 +155,14 @@ Sandbox image build、image pull、包管理器操作和高影响 PoC 都必须�
 
 PoC stdout/stderr 解释使用有界读取，避免异常大输出导致内存风险。
 
+即使没有可执行 PoC 或沙箱被 phase-block，Phase 3 也必须创建 `poc_results/` 和 `verified_findings.json`，并在每个未验证 finding 的 `verification.poc_status` / `poc_result.status` 中记录 `skipped`、`unverified` 或 `inconclusive` 及原因。只有实际执行 PoC 时才创建 `poc_results/<finding_id>/stdout.txt` 等 runner 产物。
+
 ## Phase 4：报告
 
 Phase 4 生成：
 
 - `report/blackbox-security-report.md`
-- `report/findings.json`
+- `report/findings.json`，按 `templates/report_findings.json` 校验，包含 `schema_version`、`scan_id`、`findings`、`summary` 和 `generated_at`
 - 标记 `scan_state.json.current_phase = completed`
 
 报告必须包含所有阶段的结论、fallback、coverage gap、验证限制和证据路径。

@@ -16,6 +16,11 @@ from pathlib import Path
 from typing import Any
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+ROOT = SCRIPT_DIR.parent
+sys.path.insert(0, str(ROOT))
+
+from tools.output_paths import resolve_preflight_output  # noqa: E402
+
 TARBALL_PATH = "assets/rootfs/v11-2503-rootfs.tar"
 LFS_POINTER_THRESHOLD_BYTES = 100 * 1024
 DEFAULT_REGISTRY = SCRIPT_DIR / "tool_registry.json"
@@ -88,11 +93,7 @@ def load_registry(path: str) -> tuple[Path, dict[str, Any], list[dict[str, Any]]
 
 
 def output_path(args: argparse.Namespace) -> Path:
-    if args.output:
-        return Path(args.output).expanduser().resolve()
-    if args.scan_root:
-        return Path(args.scan_root).expanduser().resolve() / "env_check.json"
-    return (Path.cwd() / "env_check.json").resolve()
+    return resolve_preflight_output(args.output, args.scan_root)
 
 
 def detect_platform() -> str:

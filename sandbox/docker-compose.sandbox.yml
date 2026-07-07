@@ -34,7 +34,7 @@ services:
         target: /pkg
         read_only: true
       - type: bind
-        source: ${RESULTS_DIR:-./results}
+        source: ${RESULTS_DIR:-./black-audit-output/results}
         target: /workspace/results
         read_only: false
     environment:

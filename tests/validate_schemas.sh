@@ -88,6 +88,7 @@ schema_for_fixture() {
     sample_merged_findings.json) echo "$SCHEMAS_DIR/merged_findings.json" ;;
     sample_coverage_report.json) echo "$SCHEMAS_DIR/coverage_report.json" ;;
     sample_verified_findings.json) echo "$SCHEMAS_DIR/verified_findings.json" ;;
+    sample_report_findings.json) echo "$SCHEMAS_DIR/report_findings.json" ;;
     sample_env_check.json) echo "$SCHEMAS_DIR/env_check.json" ;;
     *) echo "" ;;
   esac

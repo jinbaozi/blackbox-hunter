@@ -97,6 +97,8 @@ Track A adapter output starts as `finding_signal`. Promote only when sufficient 
 - Updated `$SCAN_ROOT/scan_state.json`
 - Optional `$SCAN_ROOT/logs/confidence_scoring.jsonl`
 
+The phase is complete only after `merged_findings.json` and `coverage_report.json` validate against their schemas.
+
 ## Error Handling
 
 Record phase failures in `scan_state.json.error_log`, mark the phase status as `failed` or `skipped`, and preserve partial artifacts under `$SCAN_ROOT/logs/` for resume diagnostics.

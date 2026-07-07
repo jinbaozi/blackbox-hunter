@@ -105,12 +105,13 @@ test -s "$SCAN_ROOT/report/blackbox-security-report.md"
 grep -q "发现项生命周期汇总" "$SCAN_ROOT/report/blackbox-security-report.md"
 grep -q "静态确认" "$SCAN_ROOT/report/blackbox-security-report.md"
 
-python3 - "$SCAN_ROOT/track_b_findings.json" "$SCAN_ROOT/merged_findings.json" "$SCAN_ROOT/report/findings.json" "$SCAN_ROOT/scan_state.json" <<'PY'
+python3 - "$SCAN_ROOT/track_b_findings.json" "$SCAN_ROOT/merged_findings.json" "$SCAN_ROOT/report/findings.json" "$SCAN_ROOT/scan_state.json" "$SCAN_ID" <<'PY'
 import json, sys
 track_b = json.load(open(sys.argv[1], encoding="utf-8"))
 merged = json.load(open(sys.argv[2], encoding="utf-8"))
 report_findings = json.load(open(sys.argv[3], encoding="utf-8"))
 state = json.load(open(sys.argv[4], encoding="utf-8"))
+scan_id = sys.argv[5]
 assert state["current_phase"] == "completed", state
 assert track_b["status"] == "success", track_b
 assert track_b["findings_count"] == 1, track_b
@@ -118,6 +119,10 @@ assert track_b["findings"][0]["finding_id"] == "TB-777"
 assert merged["dedup_stats"]["input_findings"] == 1, merged
 assert merged["dedup_stats"]["merged_findings"] == 1, merged
 assert merged["merged_findings"][0]["finding"]["finding_id"] == "TB-777"
+assert report_findings["schema_version"] == 1, report_findings
+assert report_findings["scan_id"] == scan_id, report_findings
+assert "generated_at" in report_findings, report_findings
+assert report_findings["summary"]["total"] == 1, report_findings
 assert len(report_findings["findings"]) == 1, report_findings
 assert report_findings["findings"][0]["finding_id"] == "TB-777"
 PY

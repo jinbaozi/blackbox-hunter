@@ -96,6 +96,29 @@ assert merged["dedup_stats"]["input_findings"] == 0
 assert "track_a_status" in merged["coverage_summary"]
 PY
 
+test -d "$TMPDIR/workspace/$DEB_SCAN_ID/poc_results"
+python3 - "$TMPDIR/workspace/$DEB_SCAN_ID/verified_findings.json" "$TMPDIR/workspace/$DEB_SCAN_ID/scan_state.json" <<'PY'
+import json, sys
+verified = json.load(open(sys.argv[1], encoding="utf-8"))
+state = json.load(open(sys.argv[2], encoding="utf-8"))
+if state["phase_status"]["phase_3"]["status"] == "skipped":
+    assert verified["verification_stats"].get("skipped", 0) >= 0
+    assert any(item.get("phase") == "phase_3" for item in state.get("error_log", [])), state
+PY
+
+DEFAULT_SCAN_ID="BBH-20260703-fwf003"
+(
+  cd "$TMPDIR"
+  python3 "$ROOT/tools/bbh_scan.py" \
+    --package "$TMPDIR/bbh-full.deb" \
+    --registry "$TMPDIR/registry-workflow.json" \
+    --scan-id "$DEFAULT_SCAN_ID" \
+    --mode quick >/dev/null
+)
+
+test -s "$TMPDIR/black-audit-output/$DEFAULT_SCAN_ID/env_check.json"
+test -s "$TMPDIR/black-audit-output/$DEFAULT_SCAN_ID/report/findings.json"
+
 cat > "$TMPDIR/bbh-full.rpm" <<'EOF'
 RPM_FIXTURE_PLACEHOLDER_FOR_CONTEXT_BUILD_ONLY
 EOF

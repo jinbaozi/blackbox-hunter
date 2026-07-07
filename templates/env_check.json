@@ -7,6 +7,7 @@
   "additionalProperties": false,
   "properties": {
     "checked_at": {"type": "string", "format": "date-time"},
+    "platform": {"type": "string", "enum": ["linux", "darwin", "unknown"]},
     "path_patched": {"type": "boolean"},
     "path_warnings": {"type": "array", "items": {"type": "string"}},
     "extended_dirs_scanned": {"type": "array", "items": {"type": "string"}},

@@ -11,6 +11,7 @@ Use this skill when the user wants to scan an rpm or deb package for vulnerabili
 
 - Package path ending in `.rpm` or `.deb`.
 - Optional scan mode: `quick`, `standard`, `deep`, or `full`.
+- Optional workspace path. If omitted, use `$PWD/black-audit-output`.
 - Optional resume path pointing to an existing `$WORKSPACE/<scan_id>/scan_state.json`.
 
 ## State Model
@@ -72,7 +73,9 @@ The canonical context rules are defined in `tools/context/context_policy.json` a
 - Every JSON output must validate against a schema under `templates/`.
 - Finding records must validate against `templates/finding.json` and use only `TA-NNN` or `TB-NNN` identifiers.
 - All phase outputs are written under `$SCAN_ROOT`, where `$SCAN_ROOT=$WORKSPACE/<scan_id>`.
+- The default workspace is `$PWD/black-audit-output`; explicit workspace paths override this default.
 - Phase logs go under `$SCAN_ROOT/logs/`.
+- Every completed phase must satisfy its required file, directory, and schema contract before the next phase starts.
 - Optional tools may degrade confidence but must not silently produce empty success output.
 - Runtime prompts must follow the Runtime Context Loading Policy and must record context expansion or degradation in phase logs.
 

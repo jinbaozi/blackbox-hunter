@@ -53,6 +53,8 @@ A blocked action must be recorded in `scan_state.json.error_log` and the affecte
 
 Before selecting findings, read `env_check.json.block_decision.phase_blocks`. If Phase 3 is blocked because Docker/Podman or another sandbox runtime is unavailable, mark Phase 3 as `skipped`, write the reason to `scan_state.json.error_log`, and continue to Phase 4 with unverified findings clearly labeled.
 
+Even when Phase 3 is skipped or no eligible PoC exists, create `$SCAN_ROOT/poc_results/` and write `verified_findings.json`. Do not create per-finding runner files such as `stdout.txt`, `stderr.txt`, or `monitor.json` unless a PoC actually ran.
+
 1. Select findings with enough reproduction detail and acceptable risk.
 2. Create one PoC testcase from `templates/poc_testcase.md` per eligible finding.
 3. Create `$SCAN_ROOT/poc_results/<finding_id>/` and bind it as `/workspace/results`.
@@ -93,7 +95,12 @@ Use `sandbox/result_interpreter.py` to map runner results into `verification.poc
 
 ## Output
 
-`verified_findings.json` wraps each finding with `poc_result` and a copy of `sandbox_status.json`.
+Required outputs:
+
+- `$SCAN_ROOT/verified_findings.json`
+- `$SCAN_ROOT/poc_results/`
+
+`verified_findings.json` wraps each finding with `poc_result` and a copy of `sandbox_status.json`. Skipped or unverified findings must include a reason in `verification.failure_reason` and `poc_result.reason`.
 
 Each `poc_result` should include:
 

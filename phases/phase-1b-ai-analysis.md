@@ -152,6 +152,8 @@ Prompt construction must fail closed if a single call exceeds the per-call promp
 
 Write `$SCAN_ROOT/track_b_findings.json` using the `track_findings.json` wrapper. Include dimensions analyzed, functions analyzed, token usage, engine failures, architecture branch, prompt manifest version, context policy version, and context-policy warnings in metadata.
 
+The phase is complete only after `$SCAN_ROOT/track_b_findings.json` validates against `templates/track_findings.json`.
+
 ## Error Handling
 
 Record phase failures in `scan_state.json.error_log`, mark the phase status as `failed` or `skipped`, and preserve partial artifacts under `$SCAN_ROOT/logs/` for resume diagnostics. If prompt manifest validation, context-policy validation, or schema validation fails after a rerun, escalate with concrete repair options rather than generating speculative findings.

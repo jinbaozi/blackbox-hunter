@@ -45,6 +45,9 @@ Collect package metadata, ELF binaries, scripts, config files, systemd units, se
 - `$SCAN_ROOT/scan_strategy.json`
 - `$SCAN_ROOT/coverage_plan.json`
 - `$SCAN_ROOT/sandbox_status.json`
+- `$SCAN_ROOT/extracted/`
+
+The phase is complete only after these artifacts validate against their schemas and the extracted directory exists.
 
 ## Error Handling
 

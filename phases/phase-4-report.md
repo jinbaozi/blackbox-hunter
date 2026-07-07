@@ -59,8 +59,16 @@ Do not describe `poc_error`, `sandbox_error`, or `inconclusive` as proof that a 
 ## Output
 
 - `$SCAN_ROOT/report/blackbox-security-report.md`
-- `$SCAN_ROOT/report/findings.json`
+- `$SCAN_ROOT/report/findings.json`, validated against `templates/report_findings.json`
 - Updated `$SCAN_ROOT/scan_state.json` marked `completed`
+
+`report/findings.json` is a versioned machine-readable summary:
+
+- `schema_version`
+- `scan_id`
+- `findings`
+- `summary`
+- `generated_at`
 
 ## Error Handling
 

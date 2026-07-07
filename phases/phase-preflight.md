@@ -74,6 +74,12 @@ Supported modes:
 
 Install hints are derived from registry `install_priority`, `system_packages`, and `install_cmds`. Host-changing package-manager, image-pull, and install actions must still require explicit user approval.
 
+Output path precedence:
+
+1. Explicit `--output`.
+2. Explicit `--scan-root`, writing `env_check.json` under that root.
+3. `$PWD/black-audit-output/env_check.json`.
+
 ## Step 6: Blocking and Degradation Decision
 
 | Priority | Status | Action |
@@ -106,7 +112,8 @@ For RPM packages, `rpm2cpio` is the primary extractor and may degrade to `7z` or
 
 ## Outputs
 
-- `$SCAN_ROOT/env_check.json`, validated against `templates/env_check.json`
+- `$SCAN_ROOT/env_check.json`, validated against `templates/env_check.json` during a scan.
+- `$PWD/black-audit-output/env_check.json` when preflight is run standalone without `--output` or `--scan-root`.
 
 ## Error Handling
 

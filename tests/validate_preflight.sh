@@ -120,6 +120,28 @@ else:
 assert data["confidence_ceiling"] < 0.95
 PY
 
+(
+  cd "$TMPDIR"
+  HOME="$TMPDIR/home" PATH="$TMPDIR/fakebin:/usr/bin:/bin" \
+    bash "$ROOT/tools/install.sh" \
+      --check-only \
+      --offline \
+      --auto-fix \
+      --package-type deb \
+      --registry "$TMPDIR/registry-ok.json"
+)
+
+python3 - "$TMPDIR/black-audit-output/env_check.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+data = json.loads(path.read_text())
+assert path.is_file()
+assert data["output_path"] == str(path)
+PY
+
 cat > "$TMPDIR/registry-rpm.json" <<'EOF'
 {
   "registry_version": 1,

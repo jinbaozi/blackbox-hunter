@@ -59,6 +59,11 @@ Track A executes host-side static tools only. Phase 3 is the first phase that ru
 
 ## Output
 
+Required outputs:
+
+- `$SCAN_ROOT/track_a_findings.json`, validated against `templates/track_findings.json`
+- `$SCAN_ROOT/raw/track_a/`
+
 Wrap all Track A findings with:
 
 ```json

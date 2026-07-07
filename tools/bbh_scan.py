@@ -25,6 +25,8 @@ sys.path.insert(0, str(ROOT))
 
 from tools.context.track_b_output_mapper import map_text  # noqa: E402
 from tools.merge.merge_runner import merge_findings  # noqa: E402
+from tools.output_contracts import validate_phase_outputs  # noqa: E402
+from tools.output_paths import resolve_workspace  # noqa: E402
 from tools.report.report_generator import generate_report, validate_required_sections  # noqa: E402
 from tools.track_a_runner import ADAPTERS as TRACK_A_ADAPTERS, run_track_a  # noqa: E402
 
@@ -80,6 +82,12 @@ def update_phase(scan_state: dict[str, Any], phase: str, status: str, error: str
     scan_state["updated_at"] = now_iso()
     if error:
         scan_state["error_log"].append({"phase": phase, "status": status, "message": error, "time": now_iso()})
+
+
+def validate_or_fail(scan_root: Path, phase: str) -> None:
+    errors = validate_phase_outputs(scan_root, phase, ROOT / "templates")
+    if errors:
+        raise RuntimeError(f"{phase} output contract failed: " + "; ".join(errors))
 
 
 def build_execution_decision(
@@ -385,6 +393,7 @@ def available_track_a_adapter_names(env: dict[str, Any]) -> list[str]:
 
 
 def write_skipped_track_a(scan_root: Path, reason: str) -> None:
+    (scan_root / "raw" / "track_a").mkdir(parents=True, exist_ok=True)
     write_json(scan_root / "track_a_findings.json", {
         "agent_id": "track-a-toolscan",
         "agent_role": "traditional-tooling",
@@ -452,6 +461,7 @@ def write_skipped_track_b(scan_root: Path, args: argparse.Namespace) -> None:
 
 
 def write_track_outputs(scan_root: Path, env: dict[str, Any], args: argparse.Namespace) -> None:
+    (scan_root / "raw" / "track_a").mkdir(parents=True, exist_ok=True)
     if args.run_track_a_tools:
         selected = available_track_a_adapter_names(env)
         if selected:
@@ -484,13 +494,54 @@ def write_merge_verify_artifacts(scan_root: Path, sid: str, env: dict[str, Any])
         "gaps": env.get("block_decision", {}).get("phase_blocks", []),
     }
     write_json(scan_root / "coverage_report.json", coverage)
+
+
+def verification_reason(phase3_blocks: list[dict[str, Any]]) -> str:
+    if phase3_blocks:
+        reasons = []
+        for block in phase3_blocks:
+            tool = block.get("tool", "sandbox")
+            reason = block.get("reason", "unavailable")
+            reasons.append(f"{tool}: {reason}")
+        return "Phase 3 blocked by sandbox prerequisites: " + "; ".join(reasons)
+    return "No executable PoC was configured for the local workflow runner"
+
+
+def write_phase3_artifacts(scan_root: Path, phase3_blocks: list[dict[str, Any]]) -> None:
+    poc_results = scan_root / "poc_results"
+    poc_results.mkdir(parents=True, exist_ok=True)
     sandbox = load_json(scan_root / "sandbox_status.json")
-    verified = {"verified_findings": [], "verification_stats": {"verified": 0, "skipped": 0}, "sandbox_info": sandbox}
+    merged = load_json(scan_root / "merged_findings.json")
+    reason = verification_reason(phase3_blocks)
+    verified_items = []
+    for item in merged.get("merged_findings", []):
+        finding = item.get("finding", {})
+        copied = json.loads(json.dumps(finding))
+        copied.setdefault("verification", {})["poc_status"] = "skipped"
+        copied["verification"]["failure_reason"] = reason
+        verified_items.append({
+            "finding": copied,
+            "poc_result": {
+                "status": "skipped",
+                "reason": reason,
+            },
+        })
+    verified = {
+        "verified_findings": verified_items,
+        "verification_stats": {
+            "verified": 0,
+            "skipped": len(verified_items),
+            "unverified": len(verified_items),
+            "inconclusive": 0,
+        },
+        "sandbox_info": sandbox,
+    }
     write_json(scan_root / "verified_findings.json", verified)
 
 
 def write_final_report(scan_root: Path) -> None:
     merged = load_json(scan_root / "merged_findings.json")
+    verified = load_json(scan_root / "verified_findings.json")
     report_dir = scan_root / "report"
     report_dir.mkdir(parents=True, exist_ok=True)
     report = generate_report(scan_root)
@@ -498,13 +549,29 @@ def write_final_report(scan_root: Path) -> None:
     if missing:
         raise RuntimeError("report generator missed required sections: " + ", ".join(missing))
     (report_dir / "blackbox-security-report.md").write_text(report, encoding="utf-8")
-    write_json(report_dir / "findings.json", {"findings": [item["finding"] for item in merged.get("merged_findings", [])]})
+    findings = [item["finding"] for item in verified.get("verified_findings", [])]
+    if not findings:
+        findings = [item["finding"] for item in merged.get("merged_findings", [])]
+    by_status: dict[str, int] = {}
+    for finding in findings:
+        status = finding.get("verification", {}).get("poc_status") or finding.get("finding_status", "unknown")
+        by_status[status] = by_status.get(status, 0) + 1
+    write_json(report_dir / "findings.json", {
+        "schema_version": 1,
+        "scan_id": load_json(scan_root / "scan_state.json").get("scan_id", ""),
+        "findings": findings,
+        "summary": {
+            "total": len(findings),
+            "by_status": by_status,
+        },
+        "generated_at": now_iso(),
+    })
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run a schema-valid BlackBox Hunter workflow")
     parser.add_argument("--package", required=True, dest="package_path")
-    parser.add_argument("--workspace", required=True)
+    parser.add_argument("--workspace", default="")
     parser.add_argument("--mode", default="quick", choices=["quick", "standard", "deep", "full"])
     parser.add_argument("--registry", default="")
     parser.add_argument("--scan-id", default="")
@@ -522,7 +589,8 @@ def main() -> int:
     args.scan_id = args.scan_id or scan_id()
     package_path = Path(args.package_path).resolve()
     package_type = infer_package_type(package_path)
-    scan_root = Path(args.workspace).resolve() / args.scan_id
+    workspace = resolve_workspace(args.workspace)
+    scan_root = workspace / args.scan_id
     scan_root.mkdir(parents=True, exist_ok=True)
     state = initial_state(args.scan_id)
     if args.action_gate:
@@ -533,24 +601,30 @@ def main() -> int:
         update_phase(state, "preflight", "running")
         env = run_preflight(args, scan_root, package_type, package_path)
         update_phase(state, "preflight", "done")
+        validate_or_fail(scan_root, "preflight")
         write_json(scan_root / "scan_state.json", state)
 
         update_phase(state, "phase_0", "running")
         build_phase0(args, scan_root, package_path, package_type, env)
         update_phase(state, "phase_0", "done")
+        validate_or_fail(scan_root, "phase_0")
 
         for phase in ("track_a", "track_b"):
             update_phase(state, phase, "running")
         write_track_outputs(scan_root, env, args)
         update_phase(state, "track_a", "done")
+        validate_or_fail(scan_root, "track_a")
         update_phase(state, "track_b", "done")
+        validate_or_fail(scan_root, "track_b")
 
         update_phase(state, "phase_2", "running")
         write_merge_verify_artifacts(scan_root, args.scan_id, env)
         update_phase(state, "phase_2", "done")
+        validate_or_fail(scan_root, "phase_2")
 
         phase3_blocks = env.get("block_decision", {}).get("phase_blocks") or []
         if phase3_blocks:
+            write_phase3_artifacts(scan_root, phase3_blocks)
             update_phase(state, "phase_3", "skipped", "; ".join(block.get("reason", "") for block in phase3_blocks))
         else:
             action_gate = state.get("action_gate", {}) or {}
@@ -559,6 +633,7 @@ def main() -> int:
                 try:
                     check_host_exception(decision, ROOT / "tools" / "host_exemptions.json")
                 except (PermissionError, ValueError) as gate_err:
+                    write_phase3_artifacts(scan_root, [{"tool": "host_exception", "reason": str(gate_err)}])
                     update_phase(state, "phase_3", "skipped")
                     state["phase_status"]["phase_3"]["execution_mode"] = "sandbox"
                     state["error_log"].append({
@@ -568,6 +643,7 @@ def main() -> int:
                         "ts": now_iso(),
                     })
                 else:
+                    write_phase3_artifacts(scan_root, [])
                     update_phase(state, "phase_3", "done")
                     state["phase_status"]["phase_3"]["execution_mode"] = "host_exception"
                     state["phase_status"]["phase_3"]["host_exception_ref"] = decision["host_exception"]["id"]
@@ -579,12 +655,16 @@ def main() -> int:
                         "ts": now_iso(),
                     })
             else:
+                write_phase3_artifacts(scan_root, [])
                 update_phase(state, "phase_3", "done")
                 state["phase_status"]["phase_3"]["execution_mode"] = "sandbox"
+        validate_or_fail(scan_root, "phase_3")
 
-        update_phase(state, "phase_4", "done")
+        update_phase(state, "phase_4", "running")
         write_json(scan_root / "scan_state.json", state)
         write_final_report(scan_root)
+        update_phase(state, "phase_4", "done")
+        validate_or_fail(scan_root, "phase_4")
         state["current_phase"] = "completed"
         state["updated_at"] = now_iso()
         write_json(scan_root / "scan_state.json", state)
@@ -602,6 +682,7 @@ def main() -> int:
             ("merged_findings.json", "merged_findings.json"),
             ("coverage_report.json", "coverage_report.json"),
             ("verified_findings.json", "verified_findings.json"),
+            ("report_findings.json", "report/findings.json"),
         ]:
             validate_json(schema_name, load_json(scan_root / doc_name), schemas)
         print(scan_root)
