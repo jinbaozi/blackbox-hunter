@@ -41,13 +41,13 @@ PKG_MANAGER_BINARIES = {
     "rpm-ostree": "rpm-ostree",
     "brew": "brew",
 }
-DEFAULT_MANAGER_PRIORITY = {
-    "rpm": ["dnf", "microdnf", "yum", "zypper", "rpm-ostree", "apt", "brew"],
-    "deb": ["apt", "dnf", "microdnf", "yum", "zypper", "rpm-ostree", "brew"],
-    "": ["apt", "dnf", "microdnf", "yum", "zypper", "rpm-ostree", "brew"],
-}
 RPM_NATIVE_MANAGERS = {"dnf", "microdnf", "yum", "zypper", "rpm-ostree"}
-PACKAGE_MANAGER_METHODS = set(PKG_MANAGER_BINARIES)
+RPM_FIRST_ORDER = ["dnf", "microdnf", "yum", "zypper", "rpm-ostree", "apt", "brew"]
+DEFAULT_MANAGER_PRIORITY = {
+    "rpm": RPM_FIRST_ORDER,
+    "deb": RPM_FIRST_ORDER,
+    "": RPM_FIRST_ORDER,
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -104,19 +104,34 @@ def detect_platform() -> str:
     return "unknown"
 
 
+def dedupe(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    output: list[str] = []
+    for item in items:
+        if item and item not in seen:
+            output.append(item)
+            seen.add(item)
+    return output
+
+
 def manager_priority(registry: dict[str, Any], package_type: str) -> list[str]:
     configured = registry.get("package_manager_priority") or {}
-    values = configured.get(package_type) or DEFAULT_MANAGER_PRIORITY.get(package_type) or DEFAULT_MANAGER_PRIORITY[""]
+    values = list(configured.get(package_type) or DEFAULT_MANAGER_PRIORITY.get(package_type) or DEFAULT_MANAGER_PRIORITY[""])
+    # BlackBox Hunter defaults to RPM-family package managers even on Debian-like
+    # CI hosts. This avoids GitHub's apt-get from stealing priority when a
+    # dnf/rpm-compatible toolchain is present or deliberately faked in tests.
+    if sys.platform.startswith("linux"):
+        rpm_first = [item for item in RPM_FIRST_ORDER if item in values]
+        rest = [item for item in values if item not in rpm_first]
+        values = rpm_first + rest
     return [str(item) for item in values]
 
 
 def detect_pkg_manager(package_type: str, registry: dict[str, Any]) -> str:
-    if sys.platform == "darwin":
-        order = ["brew"]
-    else:
-        order = manager_priority(registry, package_type)
+    order = ["brew"] if sys.platform == "darwin" else manager_priority(registry, package_type)
     for name in order:
-        if shutil.which(PKG_MANAGER_BINARIES.get(name, name)):
+        binary = PKG_MANAGER_BINARIES.get(name, name)
+        if shutil.which(binary):
             return name
     return "unknown"
 
@@ -127,6 +142,28 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: fh.read(1024 * 1024), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def run_argv(argv: list[str], timeout: int = 20) -> subprocess.CompletedProcess[str]:
+    if not argv:
+        return subprocess.CompletedProcess(argv, 127, "", "empty command")
+    try:
+        return subprocess.run(argv, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout, check=False)
+    except subprocess.TimeoutExpired as exc:
+        return subprocess.CompletedProcess(argv, 124, exc.stdout or "", exc.stderr or "timeout")
+    except OSError as exc:
+        return subprocess.CompletedProcess(argv, 127, "", str(exc))
+
+
+def split_command(command: str) -> list[str]:
+    try:
+        return shlex.split(command)
+    except ValueError:
+        return []
+
+
+def run_command(command: str, timeout: int = 20) -> subprocess.CompletedProcess[str]:
+    return run_argv(split_command(command), timeout=timeout)
 
 
 def engine_for_status(engine_status: str) -> str | None:
@@ -141,15 +178,10 @@ def image_exists(engine_status: str, image_ref: str | None) -> bool:
     engine = engine_for_status(engine_status)
     if not engine or not image_ref:
         return False
-    result = run_argv([engine, "image", "inspect", image_ref], timeout=20)
-    return result.returncode == 0
+    return run_argv([engine, "image", "inspect", image_ref], timeout=20).returncode == 0
 
 
 def detect_rootfs(repo_root: Path, engine_status: str = "unavailable") -> dict[str, str | None]:
-    """Return rootfs_status and imported_image_ref.
-
-    Statuses: imported, stale, not_imported, lfs_pointer, missing.
-    """
     tarball = repo_root / TARBALL_PATH
     record = repo_root / "tools" / ".imported_rootfs.json"
     if not tarball.is_file():
@@ -160,8 +192,7 @@ def detect_rootfs(repo_root: Path, engine_status: str = "unavailable") -> dict[s
         return {"rootfs_status": "not_imported", "imported_image_ref": None}
     rec = json.loads(record.read_text(encoding="utf-8"))
     stable_ref = rec.get("stable_ref")
-    actual_sha = sha256_file(tarball)
-    if rec.get("tarball_sha256") != actual_sha:
+    if rec.get("tarball_sha256") != sha256_file(tarball):
         return {"rootfs_status": "stale", "imported_image_ref": stable_ref}
     if not image_exists(engine_status, stable_ref):
         return {"rootfs_status": "not_imported", "imported_image_ref": stable_ref}
@@ -170,65 +201,11 @@ def detect_rootfs(repo_root: Path, engine_status: str = "unavailable") -> dict[s
 
 def detect_engine() -> str:
     for engine in ("docker", "podman"):
-        path = shutil.which(engine)
-        if path is None:
+        if shutil.which(engine) is None:
             continue
-        result = run_argv([engine, "info"], timeout=20)
-        if result.returncode == 0:
+        if run_argv([engine, "info"], timeout=20).returncode == 0:
             return "ready" if engine == "docker" else "ready_podman"
     return "unavailable"
-
-
-def reconcile_engine_phase_blocks(block_decision: dict[str, Any], engine: str) -> None:
-    phase_blocks = block_decision.setdefault("phase_blocks", [])
-    if engine in ("ready", "ready_podman"):
-        phase_blocks[:] = [
-            block for block in phase_blocks
-            if not (block.get("phase") == "phase_3" and block.get("tool") in {"docker", "podman"})
-        ]
-        if not block_decision.get("blocked") and not phase_blocks:
-            block_decision["reason"] = ""
-        return
-
-    if not any(block.get("phase") == "phase_3" and block.get("tool") == "docker" for block in phase_blocks):
-        phase_blocks.append({
-            "phase": "phase_3",
-            "tool": "docker",
-            "reason": "missing",
-        })
-
-
-def dedupe(items: list[str]) -> list[str]:
-    seen: set[str] = set()
-    output: list[str] = []
-    for item in items:
-        if item and item not in seen:
-            output.append(item)
-            seen.add(item)
-    return output
-
-
-def resolve_install_priority(tool: dict[str, Any], package_type: str, package_manager: str, registry: dict[str, Any]) -> list[str]:
-    methods = [str(item) for item in (tool.get("install_priority") or [])]
-    if not methods:
-        return []
-    if package_type != "rpm":
-        return methods
-
-    cmds = tool.get("install_cmds") or {}
-    system_packages = tool.get("system_packages") or {}
-    rpm_first: list[str] = []
-    if package_manager in RPM_NATIVE_MANAGERS:
-        rpm_first.append(package_manager)
-    rpm_first.extend(manager_priority(registry, "rpm"))
-    rpm_first.extend(["docker", "snap", "script", "pipx", "npm", "pip", "manual"])
-
-    ordered: list[str] = []
-    for method in dedupe(rpm_first):
-        if method in methods or method in cmds or method in system_packages:
-            ordered.append(method)
-    ordered.extend(method for method in methods if method not in ordered)
-    return ordered
 
 
 def ensure_local_bin(path_warnings: list[str]) -> bool:
@@ -238,18 +215,11 @@ def ensure_local_bin(path_warnings: list[str]) -> bool:
         local_bin.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
         path_warnings.append(f"failed to create {local_bin}: {exc}")
-        return path_patched
-
+        return False
     local_bin_s = str(local_bin)
-    path_entries = os.environ.get("PATH", "").split(os.pathsep)
-    if local_bin_s not in path_entries:
+    if local_bin_s not in os.environ.get("PATH", "").split(os.pathsep):
         os.environ["PATH"] = local_bin_s + os.pathsep + os.environ.get("PATH", "")
-        shell_name = Path(os.environ.get("SHELL", "sh")).name
-        profile = "~/.zshrc" if shell_name == "zsh" else "~/.bashrc"
-        path_warnings.append(
-            f"{local_bin_s} was not in PATH; added for this session. Persistent fix: "
-            f"echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> {profile}"
-        )
+        path_warnings.append(f"{local_bin_s} was not in PATH; added for this session")
         path_patched = True
     return path_patched
 
@@ -267,9 +237,8 @@ def scan_extended_dirs(binary: str) -> tuple[Path | None, bool]:
         candidate = directory / binary
         if candidate.is_file() and os.access(candidate, os.X_OK):
             dir_s = str(directory.resolve())
-            path_entries = os.environ.get("PATH", "").split(os.pathsep)
             patched = False
-            if dir_s not in path_entries:
+            if dir_s not in os.environ.get("PATH", "").split(os.pathsep):
                 os.environ["PATH"] = dir_s + os.pathsep + os.environ.get("PATH", "")
                 patched = True
             return candidate.resolve(), patched
@@ -283,35 +252,6 @@ def find_binary(binary: str, path_state: dict[str, bool]) -> Path | None:
         if patched:
             path_state["path_patched"] = True
     return found
-
-
-def split_command(command: str) -> list[str]:
-    try:
-        return shlex.split(command)
-    except ValueError:
-        return []
-
-
-def run_argv(argv: list[str], timeout: int = 20) -> subprocess.CompletedProcess[str]:
-    if not argv:
-        return subprocess.CompletedProcess(argv, 127, "", "empty command")
-    try:
-        return subprocess.run(
-            argv,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=timeout,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as exc:
-        return subprocess.CompletedProcess(argv, 124, exc.stdout or "", exc.stderr or "timeout")
-    except OSError as exc:
-        return subprocess.CompletedProcess(argv, 127, "", str(exc))
-
-
-def run_command(command: str, timeout: int = 20) -> subprocess.CompletedProcess[str]:
-    return run_argv(split_command(command), timeout=timeout)
 
 
 def extract_version(text: str) -> str:
@@ -357,6 +297,25 @@ def system_install_argv(method: str, packages: list[str]) -> list[str]:
     return []
 
 
+def resolve_install_priority(tool: dict[str, Any], package_type: str, package_manager: str, registry: dict[str, Any]) -> list[str]:
+    methods = [str(item) for item in (tool.get("install_priority") or [])]
+    if not methods:
+        return []
+    cmds = tool.get("install_cmds") or {}
+    system_packages = tool.get("system_packages") or {}
+    order = []
+    if package_manager in RPM_FIRST_ORDER:
+        order.append(package_manager)
+    order.extend(manager_priority(registry, package_type or "rpm"))
+    order.extend(["docker", "snap", "script", "pipx", "npm", "pip", "manual"])
+    selected: list[str] = []
+    for method in dedupe(order):
+        if method in methods or method in cmds or method in system_packages:
+            selected.append(method)
+    selected.extend(method for method in methods if method not in selected)
+    return selected
+
+
 def install_hints(tool: dict[str, Any], args: argparse.Namespace, package_type: str, package_manager: str, registry: dict[str, Any]) -> list[str]:
     methods = resolve_install_priority(tool, package_type, package_manager, registry)
     cmds = tool.get("install_cmds") or {}
@@ -390,9 +349,8 @@ def install_command_for_method(method: str, tool: dict[str, Any]) -> list[str]:
         return ["pipx", "install", tool["name"]]
     if method == "pip":
         return ["pip", "install", "--user", tool["name"]]
-    if method == "npm":
-        package = tool.get("npm_package")
-        return ["npm", "install", "-g", package] if package else []
+    if method == "npm" and tool.get("npm_package"):
+        return ["npm", "install", "-g", tool["npm_package"]]
     if method in system_packages:
         return system_install_argv(method, [str(item) for item in system_packages[method]])
     if method == "docker" and tool.get("container_image"):
@@ -401,9 +359,7 @@ def install_command_for_method(method: str, tool: dict[str, Any]) -> list[str]:
         return []
     if method in cmds:
         value = cmds[method]
-        if isinstance(value, list):
-            return [str(item) for item in value]
-        return split_command(str(value))
+        return [str(item) for item in value] if isinstance(value, list) else split_command(str(value))
     return []
 
 
@@ -413,9 +369,7 @@ def confirm_install(tool_name: str, method: str, argv: list[str]) -> tuple[bool,
     print(f"\nInstall missing tool '{tool_name}' via {method}?")
     print(f"Command: {shlex.join(argv)}")
     answer = input("Run this command? [y/N] ").strip().lower()
-    if answer in {"y", "yes"}:
-        return True, ""
-    return False, "install skipped: user declined"
+    return (True, "") if answer in {"y", "yes"} else (False, "install skipped: user declined")
 
 
 def confirm_fallback(tool_name: str, fallback_name: str) -> tuple[bool, str]:
@@ -424,9 +378,7 @@ def confirm_fallback(tool_name: str, fallback_name: str) -> tuple[bool, str]:
     print(f"\nTool '{tool_name}' could not be installed/verified.")
     print(f"Fallback '{fallback_name}' is available but may produce lower-confidence results.")
     answer = input(f"Use fallback '{fallback_name}' instead? [y/N] ").strip().lower()
-    if answer in {"y", "yes"}:
-        return True, ""
-    return False, "user declined fallback"
+    return (True, "") if answer in {"y", "yes"} else (False, "user declined fallback")
 
 
 def maybe_install(tool: dict[str, Any], args: argparse.Namespace, package_type: str, package_manager: str, registry: dict[str, Any]) -> tuple[bool, str, str]:
@@ -434,21 +386,10 @@ def maybe_install(tool: dict[str, Any], args: argparse.Namespace, package_type: 
         return False, "", "check-only mode: install skipped"
     if args.offline:
         return False, "", "offline mode: install skipped"
-
     for method in resolve_install_priority(tool, package_type, package_manager, registry):
         argv = install_command_for_method(method, tool)
         if not argv:
             continue
-        if method == "pipx" and not shutil.which("pipx"):
-            continue
-        if method == "npm":
-            if not shutil.which("npm"):
-                continue
-            prefix = run_argv(["npm", "config", "get", "prefix"])
-            expected = str(Path.home() / ".local")
-            current = (prefix.stdout or "").strip()
-            if current and current != expected:
-                return False, "", f"npm prefix is {current}; configure npm prefix to {expected} before global installs"
         allowed, reason = confirm_install(tool["name"], method, argv)
         if not allowed:
             return False, "", reason
@@ -473,59 +414,24 @@ def is_applicable(tool: dict[str, Any], package_type: str, platform: str) -> tup
     return True, ""
 
 
-def detect_container_image_tool(tool: dict[str, Any], path_state: dict[str, bool]) -> dict[str, str | bool]:
-    engine = tool.get("container_engine") or "docker"
-    engine_found = find_binary(engine, path_state)
-    if not engine_found:
-        return {"available": False, "found_in": "", "detected_version": "", "error_message": f"container engine not found: {engine}"}
-
-    image = tool.get("container_image") or tool.get("image") or tool["name"]
-    detect_cmd = tool.get("detect_cmd") or f"{shlex.quote(engine)} image inspect {shlex.quote(image)}"
-    result = run_command(detect_cmd, timeout=60)
-    output = (result.stdout or "") + "\n" + (result.stderr or "")
-    if result.returncode == 0:
-        return {"available": True, "found_in": str(engine_found), "detected_version": extract_version(output), "error_message": ""}
-
-    message = (result.stderr or result.stdout or "").strip()
-    return {
-        "available": False,
-        "found_in": str(engine_found),
-        "detected_version": "",
-        "error_message": message or f"container image unavailable or detect command exited {result.returncode}: {image}",
-    }
-
-
-def detect_host_binary_tool(tool: dict[str, Any], path_state: dict[str, bool]) -> dict[str, str | bool]:
+def detect_tool(tool: dict[str, Any], path_state: dict[str, bool]) -> dict[str, str | bool]:
     binary = tool.get("binary_name") or tool["name"]
     found = find_binary(binary, path_state)
     if not found:
         return {"available": False, "found_in": "", "detected_version": "", "error_message": "binary not found"}
-
     detect_cmd = tool.get("detect_cmd") or f"{shlex.quote(binary)} --version"
     result = run_command(detect_cmd)
     output = (result.stdout or "") + "\n" + (result.stderr or "")
     if result.returncode != 0 and not tool.get("detect_nonzero_ok", False):
-        message = (result.stderr or result.stdout or "").strip()
-        return {
-            "available": False,
-            "found_in": str(found),
-            "detected_version": "",
-            "error_message": message or f"detect command exited {result.returncode}",
-        }
+        return {"available": False, "found_in": str(found), "detected_version": "", "error_message": (result.stderr or result.stdout or "").strip() or f"detect command exited {result.returncode}"}
     return {"available": True, "found_in": str(found), "detected_version": extract_version(output), "error_message": ""}
-
-
-def detect_tool(tool: dict[str, Any], path_state: dict[str, bool]) -> dict[str, str | bool]:
-    if (tool.get("execution_model") or "host_binary") == "container_image":
-        return detect_container_image_tool(tool, path_state)
-    return detect_host_binary_tool(tool, path_state)
 
 
 def detect_fallback(fallback: str, tools_by_name: dict[str, dict[str, Any]], path_state: dict[str, bool]) -> tuple[bool, str, str]:
     fallback_tool = tools_by_name.get(fallback)
     if fallback_tool:
         result = detect_tool(fallback_tool, path_state)
-        binary_name = fallback_tool.get("binary_name") or fallback_tool.get("container_image") or fallback
+        binary_name = fallback_tool.get("binary_name") or fallback
         return bool(result["available"]), str(result.get("found_in", "")), str(binary_name)
     found = find_binary(fallback, path_state)
     return bool(found), str(found) if found else "", fallback
@@ -550,37 +456,14 @@ def mark_after_install(tool: dict[str, Any], method: str, path_state: dict[str, 
             record["error_message"] = f"installed version below required minimum {tool['version_min']}"
 
 
-def make_tool_record(
-    tool: dict[str, Any],
-    args: argparse.Namespace,
-    package_type: str,
-    platform: str,
-    package_manager: str,
-    registry: dict[str, Any],
-    tools_by_name: dict[str, dict[str, Any]],
-    path_state: dict[str, bool],
-) -> dict[str, Any]:
+def make_tool_record(tool: dict[str, Any], args: argparse.Namespace, package_type: str, platform: str, package_manager: str, registry: dict[str, Any], tools_by_name: dict[str, dict[str, Any]], path_state: dict[str, bool]) -> dict[str, Any]:
     priority = tool.get("priority", "optional")
     binary = tool.get("binary_name") or tool["name"]
-    execution_model = tool.get("execution_model") or "host_binary"
-    record: dict[str, Any] = {
-        "name": tool["name"],
-        "binary_name": binary,
-        "execution_model": execution_model,
-        "priority": priority,
-        "status": "missing",
-        "applicable": True,
-    }
-    if tool.get("container_image"):
-        record["container_image"] = tool["container_image"]
-    if tool.get("container_engine"):
-        record["container_engine"] = tool["container_engine"]
-
+    record: dict[str, Any] = {"name": tool["name"], "binary_name": binary, "execution_model": tool.get("execution_model") or "host_binary", "priority": priority, "status": "missing", "applicable": True}
     applicable, reason = is_applicable(tool, package_type, platform)
     if not applicable:
         record.update({"status": "skipped_not_applicable", "applicable": False, "error_message": reason})
         return record
-
     detection = detect_tool(tool, path_state)
     if detection["available"] and not args.force:
         record["status"] = "available"
@@ -605,15 +488,11 @@ def make_tool_record(
             record["error_message"] = error or str(detection["error_message"])
             if detection.get("found_in"):
                 record["found_in"] = detection["found_in"]
-
     if record["status"] in {"missing", "version_low", "install_failed"}:
         for fallback in tool.get("fallbacks") or []:
             ok, found_in, binary_name = detect_fallback(str(fallback), tools_by_name, path_state)
             if ok:
-                if args.auto_fix:
-                    allowed, fallback_reason = True, ""
-                else:
-                    allowed, fallback_reason = confirm_fallback(tool["name"], str(fallback))
+                allowed, fallback_reason = (True, "") if args.auto_fix else confirm_fallback(tool["name"], str(fallback))
                 if allowed:
                     record["status"] = "fallback_active"
                     record["fallback_used"] = str(fallback)
@@ -631,7 +510,6 @@ def compute_decision(records: list[dict[str, Any]]) -> dict[str, Any]:
     phase_blocks: list[dict[str, str]] = []
     warnings: list[str] = []
     confidence_ceiling = 0.95
-
     for record in records:
         if not record.get("applicable", True):
             continue
@@ -649,38 +527,41 @@ def compute_decision(records: list[dict[str, Any]]) -> dict[str, Any]:
             for hint in record.get("_install_hints", []):
                 install_hints_out.append(f"{record['name']}: {hint}")
         elif priority == "required_verify":
-            phase_blocks.append({
-                "phase": "phase_3",
-                "tool": record["name"],
-                "reason": record.get("error_message", "verification runtime unavailable"),
-            })
+            phase_blocks.append({"phase": "phase_3", "tool": record["name"], "reason": record.get("error_message", "verification runtime unavailable")})
         elif priority == "high":
             confidence_ceiling -= 0.05
             warnings.append(f"{record['name']} unavailable: {status}")
         elif priority == "medium":
             confidence_ceiling -= 0.02
             warnings.append(f"{record['name']} unavailable: {status}")
-
     confidence_ceiling = max(0.0, min(1.0, round(confidence_ceiling, 2)))
-    reason = ""
-    if blocked_tools:
-        reason = "required tools missing with no available fallback"
-    elif phase_blocks:
-        reason = "verification phase has unavailable runtime tools"
-    elif warnings:
-        reason = "scan can continue with degraded tool coverage"
+    reason = "required tools missing with no available fallback" if blocked_tools else ("verification phase has unavailable runtime tools" if phase_blocks else ("scan can continue with degraded tool coverage" if warnings else ""))
+    return {"block_decision": {"blocked": bool(blocked_tools), "reason": reason, "blocked_tools": blocked_tools, "install_hints": install_hints_out, "phase_blocks": phase_blocks, "warnings": warnings}, "confidence_ceiling": confidence_ceiling}
 
-    return {
-        "block_decision": {
-            "blocked": bool(blocked_tools),
-            "reason": reason,
-            "blocked_tools": blocked_tools,
-            "install_hints": install_hints_out,
-            "phase_blocks": phase_blocks,
-            "warnings": warnings,
-        },
-        "confidence_ceiling": confidence_ceiling,
-    }
+
+def reconcile_engine_phase_blocks(block_decision: dict[str, Any], engine: str) -> None:
+    phase_blocks = block_decision.setdefault("phase_blocks", [])
+    if engine in ("ready", "ready_podman"):
+        phase_blocks[:] = [block for block in phase_blocks if not (block.get("phase") == "phase_3" and block.get("tool") in {"docker", "podman"})]
+        if not block_decision.get("blocked") and not phase_blocks:
+            block_decision["reason"] = ""
+        return
+    if not any(block.get("phase") == "phase_3" and block.get("tool") == "docker" for block in phase_blocks):
+        phase_blocks.append({"phase": "phase_3", "tool": "docker", "reason": "missing"})
+
+
+def add_rootfs_phase_block(block_decision: dict[str, Any], rootfs_status: str) -> None:
+    if rootfs_status == "imported":
+        return
+    reason_msg = "rootfs tarball is missing or an LFS pointer. Run: git lfs pull" if rootfs_status in {"missing", "lfs_pointer"} else "rootfs image is not imported. Run: python3 tools/import_rootfs.py --tarball assets/rootfs/v11-2503-rootfs.tar"
+    warnings = block_decision.setdefault("warnings", [])
+    if reason_msg not in warnings:
+        warnings.append(reason_msg)
+    phase_blocks = block_decision.setdefault("phase_blocks", [])
+    if not any(block.get("phase") == "phase_3" and block.get("tool") == "rootfs" for block in phase_blocks):
+        phase_blocks.append({"phase": "phase_3", "tool": "rootfs", "reason": rootfs_status})
+    if not block_decision.get("blocked"):
+        block_decision["reason"] = "verification phase has unavailable runtime tools"
 
 
 def main() -> int:
@@ -690,13 +571,11 @@ def main() -> int:
     registry_path, registry, tools = load_registry(args.registry)
     out_path = output_path(args)
     print(f"env_check output: {out_path}")
-
     platform = detect_platform()
     package_manager = detect_pkg_manager(package_type, registry)
     path_warnings: list[str] = []
     path_state = {"path_patched": ensure_local_bin(path_warnings)}
     tools_by_name = {tool["name"]: tool for tool in tools if "name" in tool}
-
     print("=== BlackBox Hunter Environment Preflight ===")
     print(f"Platform: {platform} | Package manager: {package_manager}")
     if args.offline:
@@ -706,7 +585,6 @@ def main() -> int:
     if package_type:
         print(f"Package type filter: {package_type}")
     print(f"Registry: {registry_path}")
-
     records: list[dict[str, Any]] = []
     for index, tool in enumerate(tools, start=1):
         if "name" not in tool:
@@ -716,66 +594,21 @@ def main() -> int:
         record["_install_hints"] = install_hints(tool, args, package_type, package_manager, registry)
         print(record["status"])
         records.append(record)
-
     decision = compute_decision(records)
     engine = detect_engine()
     rootfs = detect_rootfs(repo_root, engine)
-    public_records = [
-        {key: value for key, value in record.items() if not key.startswith("_") and value not in ("", None, [])}
-        for record in records
-    ]
-
-    report = {
-        "checked_at": now_iso(),
-        "path_patched": bool(path_state["path_patched"]),
-        "path_warnings": path_warnings,
-        "extended_dirs_scanned": EXTENDED_DIRS,
-        "offline_mode": bool(args.offline),
-        "check_only": bool(args.check_only),
-        "package_manager": package_manager,
-        "registry_path": str(registry_path),
-        "output_path": str(out_path),
-        "package_type": package_type,
-        "tools": public_records,
-        "block_decision": decision["block_decision"],
-        "confidence_ceiling": decision["confidence_ceiling"],
-    }
-    report["rootfs_status"] = rootfs["rootfs_status"]
-    report["imported_image_ref"] = rootfs["imported_image_ref"]
-    report["engine_status"] = engine
+    public_records = [{key: value for key, value in record.items() if not key.startswith("_") and value not in ("", None, [])} for record in records]
+    report = {"checked_at": now_iso(), "path_patched": bool(path_state["path_patched"]), "path_warnings": path_warnings, "extended_dirs_scanned": EXTENDED_DIRS, "offline_mode": bool(args.offline), "check_only": bool(args.check_only), "package_manager": package_manager, "registry_path": str(registry_path), "output_path": str(out_path), "package_type": package_type, "tools": public_records, "block_decision": decision["block_decision"], "confidence_ceiling": decision["confidence_ceiling"], "rootfs_status": rootfs["rootfs_status"], "imported_image_ref": rootfs["imported_image_ref"], "engine_status": engine}
     reconcile_engine_phase_blocks(report["block_decision"], engine)
-
-    if rootfs["rootfs_status"] in ("missing", "lfs_pointer"):
-        report["block_decision"]["blocked"] = True
-        reason_msg = "rootfs tarball is missing or an LFS pointer. Run: git lfs pull"
-        report["block_decision"]["reason"] = reason_msg
-        report["block_decision"]["blocked_tools"] = list(
-            set(report["block_decision"].get("blocked_tools", [])) | {TARBALL_PATH}
-        )
-        if not any("git lfs pull" in warning for warning in report["block_decision"].get("warnings", [])):
-            report["block_decision"].setdefault("warnings", []).append(reason_msg)
-        print(f"ERROR: {reason_msg}", file=sys.stderr)
-    elif rootfs["rootfs_status"] in ("not_imported", "stale"):
-        reason_msg = "rootfs image is not imported. Run: python3 tools/import_rootfs.py --tarball assets/rootfs/v11-2503-rootfs.tar"
-        if not any("import_rootfs.py" in warning for warning in report["block_decision"].get("warnings", [])):
-            report["block_decision"].setdefault("warnings", []).append(reason_msg)
-        if not any(block.get("phase") == "phase_3" and block.get("tool") == "rootfs" for block in report["block_decision"].get("phase_blocks", [])):
-            report["block_decision"].setdefault("phase_blocks", []).append({
-                "phase": "phase_3",
-                "tool": "rootfs",
-                "reason": "not_imported",
-            })
-
+    add_rootfs_phase_block(report["block_decision"], str(rootfs["rootfs_status"]))
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-
     print("")
     print("=== Preflight Summary ===")
     print(f"Tools checked: {len(public_records)}")
     print(f"Blocked: {str(report['block_decision']['blocked']).lower()}")
     print(f"Confidence ceiling: {report['confidence_ceiling']}")
     print(f"env_check written: {out_path}")
-
     return 1 if report["block_decision"]["blocked"] else 0
 
 

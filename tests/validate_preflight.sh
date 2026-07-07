@@ -90,7 +90,6 @@ HOME="$TMPDIR/home" PATH="$TMPDIR/fakebin:/usr/bin:/bin" \
 
 python3 - "$TMPDIR/scan/env_check.json" <<'PY'
 import json
-import shutil
 import sys
 from pathlib import Path
 
@@ -99,24 +98,20 @@ tools = {tool["name"]: tool for tool in data["tools"]}
 assert data["output_path"].endswith("/scan/env_check.json")
 assert data["path_patched"] is True
 assert data["package_type"] == "deb"
-assert data["package_manager"] in {"apt", "dnf", "microdnf", "yum", "zypper", "rpm-ostree", "brew", "unknown"}
-if shutil.which("apt-get"):
-    assert data["package_manager"] == "apt", data["package_manager"]
+assert data["package_manager"] == "dnf", data["package_manager"]
 assert tools["primary-required"]["status"] == "fallback_active"
 assert tools["primary-required"]["fallback_used"] == "fallback-ok"
 assert tools["lowtool"]["status"] == "version_low"
 assert tools["rpm-only"]["status"] == "skipped_not_applicable"
 assert data["block_decision"]["blocked"] is False
 
-docker_status = tools["docker"]["status"]
 phase_blocks = data["block_decision"].get("phase_blocks") or []
-if data.get("rootfs_status") in {"not_imported", "stale"}:
+if data.get("rootfs_status") in {"missing", "lfs_pointer", "not_imported", "stale"}:
     assert any(block.get("phase") == "phase_3" and block.get("tool") == "rootfs" for block in phase_blocks)
 if data.get("engine_status") == "ready":
     assert not any(block.get("phase") == "phase_3" and block.get("tool") == "docker" for block in phase_blocks)
 else:
     assert any(block.get("phase") == "phase_3" and block.get("tool") == "docker" for block in phase_blocks)
-
 assert data["confidence_ceiling"] < 0.95
 PY
 
@@ -135,11 +130,11 @@ python3 - "$TMPDIR/black-audit-output/env_check.json" <<'PY'
 import json
 import sys
 from pathlib import Path
-
 path = Path(sys.argv[1])
 data = json.loads(path.read_text())
 assert path.is_file()
 assert data["output_path"] == str(path)
+assert data["package_manager"] == "dnf"
 PY
 
 cat > "$TMPDIR/registry-rpm.json" <<'EOF'
@@ -227,7 +222,6 @@ HOME="$TMPDIR/home" PATH="$TMPDIR/fakebin:/usr/bin:/bin" \
     --output "$TMPDIR/blocked-env-check.json"
 rc=$?
 set -e
-
 [ "$rc" -eq 1 ] || { echo "FAIL: expected hard-block exit 1, got $rc"; exit 1; }
 
 python3 - "$TMPDIR/blocked-env-check.json" <<'PY'
@@ -236,6 +230,7 @@ import sys
 from pathlib import Path
 
 data = json.loads(Path(sys.argv[1]).read_text())
+assert data["package_manager"] == "dnf"
 assert data["block_decision"]["blocked"] is True
 assert data["block_decision"]["blocked_tools"] == ["must-have"]
 assert data["block_decision"]["install_hints"]
@@ -273,7 +268,6 @@ HOME="$TMPDIR/home" PATH="$TMPDIR/fakebin:/usr/bin:/bin" \
     --output "$TMPDIR/blocked-rpm-env-check.json"
 rc=$?
 set -e
-
 [ "$rc" -eq 1 ] || { echo "FAIL: expected rpm hard-block exit 1, got $rc"; exit 1; }
 
 python3 - "$TMPDIR/blocked-rpm-env-check.json" <<'PY'
