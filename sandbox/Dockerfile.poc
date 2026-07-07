@@ -3,6 +3,29 @@
 # assets/rootfs/v11-2503-rootfs.tar (git-lfs).
 FROM bbh-base:local-imported
 
+USER root
+
+RUN set -eux; \
+    deb_core_tools="bash coreutils findutils procps python3 file binutils"; \
+    rpm_core_tools="bash coreutils findutils procps-ng python3 file binutils"; \
+    deb_extra_tools="iproute2 checksec yara rpm cpio p7zip-full libarchive-tools"; \
+    rpm_extra_tools="iproute checksec yara rpm cpio p7zip p7zip-plugins libarchive"; \
+    if command -v apt-get >/dev/null 2>&1; then \
+        apt-get update; \
+        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $deb_core_tools $deb_extra_tools || \
+            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $deb_core_tools; \
+        rm -rf /var/lib/apt/lists/*; \
+    elif command -v dnf >/dev/null 2>&1; then \
+        dnf install -y $rpm_core_tools $rpm_extra_tools || dnf install -y $rpm_core_tools; \
+        dnf clean all; \
+    elif command -v microdnf >/dev/null 2>&1; then \
+        microdnf install -y $rpm_core_tools $rpm_extra_tools || microdnf install -y $rpm_core_tools; \
+        microdnf clean all; \
+    elif command -v yum >/dev/null 2>&1; then \
+        yum install -y $rpm_core_tools $rpm_extra_tools || yum install -y $rpm_core_tools; \
+        yum clean all; \
+    fi
+
 COPY monitor.sh /opt/monitor.sh
 COPY run_poc.sh /opt/run_poc.sh
 RUN chmod +x /opt/monitor.sh /opt/run_poc.sh \

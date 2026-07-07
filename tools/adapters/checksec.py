@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -27,14 +28,20 @@ class ChecksecAdapter:
 
     def build_commands(self, target_profile: dict[str, Any], scan_root: Path) -> list[ToolCommand]:
         commands = []
+        seen: set[str] = set()
         for item in target_profile.get("binaries", []):
             if not item.get("elf", True):
                 continue
             binary = item.get("path")
             if not binary:
                 continue
-            output = scan_root / "raw" / "track_a" / "checksec" / (Path(binary).name + ".txt")
-            commands.append(ToolCommand(argv=["checksec", "--file", binary], timeout_sec=60, output_path=str(output)))
+            binary_key = str(Path(binary).expanduser().resolve(strict=False))
+            if binary_key in seen:
+                continue
+            seen.add(binary_key)
+            digest = hashlib.sha256(binary_key.encode("utf-8")).hexdigest()[:12]
+            output = scan_root / "raw" / "track_a" / "checksec" / f"{Path(binary).name}-{digest}.txt"
+            commands.append(ToolCommand(argv=["checksec", "--file", binary_key], timeout_sec=60, output_path=str(output)))
         return commands
 
     def parse_output(self, raw_path: Path) -> ToolResult:

@@ -42,6 +42,10 @@ check_contains "$SANDBOX_DIR/docker-compose.sandbox.yml" 'cap_drop:' "capabiliti
 check_contains "$SANDBOX_DIR/docker-compose.sandbox.yml" 'RESULTS_DIR' "results directory is bind-mounted"
 check_contains "$SANDBOX_DIR/docker-compose.sandbox.yml" '/workspace/results' "results target is stable"
 check_contains "$SANDBOX_DIR/docker-compose.sandbox.yml" 'read_only:[[:space:]]+false' "results mount is writable"
+check_contains "$SANDBOX_DIR/Dockerfile.poc" 'apt-get|dnf|microdnf|yum' "image installs core tools"
+check_contains "$SANDBOX_DIR/Dockerfile.poc" 'checksec' "image includes checksec install"
+check_contains "$SANDBOX_DIR/Dockerfile.poc" 'yara' "image includes yara install"
+check_contains "$SANDBOX_DIR/Dockerfile.poc" 'iproute2|iproute' "image includes network inspection tools"
 
 check_contains "$SANDBOX_DIR/seccomp-profile.json" '"defaultAction"[[:space:]]*:[[:space:]]*"SCMP_ACT_ERRNO"' "seccomp default deny"
 

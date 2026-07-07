@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from tools.context.track_b_output_mapper import map_text  # noqa: E402
+from tools.context.action_gate import ActionRequest, evaluate_action  # noqa: E402
 from tools.merge.merge_runner import merge_findings  # noqa: E402
 from tools.output_contracts import validate_phase_outputs  # noqa: E402
 from tools.output_paths import resolve_workspace  # noqa: E402
@@ -225,6 +226,48 @@ def run_preflight(args: argparse.Namespace, scan_root: Path, package_type: str, 
     if result.returncode != 0 or env.get("block_decision", {}).get("blocked"):
         raise RuntimeError("preflight hard-blocked: " + "; ".join(env.get("block_decision", {}).get("blocked_tools", [])))
     return env
+
+
+def run_rootfs_import(scan_root: Path) -> None:
+    cmd = [
+        sys.executable,
+        str(ROOT / "tools" / "import_rootfs.py"),
+        "--tarball",
+        str(ROOT / "assets" / "rootfs" / "v11-2503-rootfs.tar"),
+        "--tag-prefix",
+        "bbh-base",
+        "--record-path",
+        str(ROOT / "tools" / ".imported_rootfs.json"),
+    ]
+    result = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=1800)
+    logs = scan_root / "logs"
+    logs.mkdir(parents=True, exist_ok=True)
+    (logs / "rootfs_import.stdout.txt").write_text(result.stdout, encoding="utf-8")
+    (logs / "rootfs_import.stderr.txt").write_text(result.stderr, encoding="utf-8")
+    if result.returncode != 0:
+        message = (result.stderr or result.stdout or "").strip()
+        raise RuntimeError(f"rootfs_import_failed: {message or result.returncode}")
+
+
+def ensure_rootfs_imported(
+    args: argparse.Namespace,
+    scan_root: Path,
+    package_type: str,
+    package_path: Path,
+    env: dict[str, Any],
+) -> dict[str, Any]:
+    if getattr(args, "no_auto_rootfs_import", False):
+        return env
+    if env.get("rootfs_status") not in {"not_imported", "stale"}:
+        return env
+    if env.get("engine_status") not in {"ready", "ready_podman"}:
+        return env
+
+    run_rootfs_import(scan_root)
+    refreshed = run_preflight(args, scan_root, package_type, package_path)
+    if refreshed.get("rootfs_status") != "imported":
+        raise RuntimeError(f"rootfs_import_failed: status after import is {refreshed.get('rootfs_status', 'unknown')}")
+    return refreshed
 
 
 def run_cmd(argv: list[str], timeout: int = 120) -> subprocess.CompletedProcess[str]:
@@ -539,6 +582,139 @@ def write_phase3_artifacts(scan_root: Path, phase3_blocks: list[dict[str, Any]])
     write_json(scan_root / "verified_findings.json", verified)
 
 
+def read_text_default(path: Path, default: str = "") -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return default
+
+
+def write_phase3_result_artifacts(scan_root: Path, result: dict[str, Any]) -> None:
+    sandbox = load_json(scan_root / "sandbox_status.json")
+    merged = load_json(scan_root / "merged_findings.json")
+    status = str(result.get("status") or "sandbox_error")
+    reason = str(result.get("reason") or status)
+    verified_items = []
+    for item in merged.get("merged_findings", []):
+        finding = item.get("finding", {})
+        copied = json.loads(json.dumps(finding))
+        copied.setdefault("verification", {})["poc_status"] = status
+        if status != "completed":
+            copied["verification"]["failure_reason"] = reason
+        verified_items.append({
+            "finding": copied,
+            "poc_result": {
+                "status": status,
+                "reason": reason,
+                "results_dir": result.get("results_dir", ""),
+            },
+        })
+
+    verified_count = len(verified_items) if status == "completed" else 0
+    skipped_count = 0
+    inconclusive_count = len(verified_items) if status in {"poc_error", "sandbox_error", "timeout"} else 0
+    unverified_count = len(verified_items) - verified_count
+    write_json(scan_root / "verified_findings.json", {
+        "verified_findings": verified_items,
+        "verification_stats": {
+            "verified": verified_count,
+            "skipped": skipped_count,
+            "unverified": unverified_count,
+            "inconclusive": inconclusive_count,
+        },
+        "sandbox_info": sandbox,
+    })
+
+
+def run_phase3_sandbox(args: argparse.Namespace, scan_root: Path) -> dict[str, Any]:
+    poc_dir = Path(args.poc_dir).resolve()
+    results_dir = scan_root / "poc_results"
+    results_dir.mkdir(parents=True, exist_ok=True)
+    package_dir = scan_root / "extracted"
+    request = ActionRequest(
+        action_type="run_poc",
+        phase="phase_3",
+        command=["docker", "compose", "-f", "docker-compose.sandbox.yml", "up"],
+        severity=str(getattr(args, "poc_severity", "medium")),
+        requires_network=False,
+        runs_target_code=True,
+        privileged=False,
+        in_sandbox=True,
+        user_approved=bool(getattr(args, "poc_approved", False)),
+    )
+    decision = evaluate_action(request)
+    if not decision.allowed:
+        raise PermissionError("phase3_action_denied: " + decision.reason)
+
+    cmd = [
+        "docker",
+        "compose",
+        "-f",
+        "docker-compose.sandbox.yml",
+        "up",
+        "--build",
+        "--abort-on-container-exit",
+        "--exit-code-from",
+        "poc-sandbox",
+    ]
+    env = os.environ.copy()
+    env.update({
+        "SCAN_ID": str(args.scan_id),
+        "CONTAINER_NAME": f"bbh-poc-{args.scan_id}",
+        "POC_DIR": str(poc_dir),
+        "PACKAGE_DIR": str(package_dir),
+        "RESULTS_DIR": str(results_dir),
+        "POC_SCRIPT": str(args.poc_script),
+        "TIMEOUT": str(args.poc_timeout),
+    })
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=ROOT / "sandbox",
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=int(args.poc_timeout) + 120,
+        )
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        result = subprocess.CompletedProcess(cmd, 124, getattr(exc, "stdout", "") or "", str(exc))
+
+    logs = scan_root / "logs"
+    logs.mkdir(parents=True, exist_ok=True)
+    (logs / "phase3_sandbox.stdout.txt").write_text(result.stdout or "", encoding="utf-8", errors="replace")
+    (logs / "phase3_sandbox.stderr.txt").write_text(result.stderr or "", encoding="utf-8", errors="replace")
+
+    status_path = results_dir / "status.txt"
+    if not status_path.is_file():
+        status_path.write_text("sandbox_error\n", encoding="utf-8")
+        (results_dir / "exit_code.txt").write_text(str(result.returncode) + "\n", encoding="utf-8")
+        (results_dir / "timeout.txt").write_text("false\n", encoding="utf-8")
+        reason = (result.stderr or result.stdout or f"docker compose exited {result.returncode}").strip()
+        (results_dir / "stderr.txt").write_text(reason + "\n", encoding="utf-8", errors="replace")
+        (results_dir / "stdout.txt").touch()
+        phase_result = {
+            "status": "sandbox_error",
+            "exit_code": result.returncode,
+            "reason": reason,
+            "results_dir": str(results_dir),
+        }
+        write_phase3_result_artifacts(scan_root, phase_result)
+        return phase_result
+
+    status = read_text_default(status_path, "sandbox_error")
+    phase_result = {
+        "status": status,
+        "exit_code": int(read_text_default(results_dir / "exit_code.txt", str(result.returncode)) or result.returncode),
+        "timeout": read_text_default(results_dir / "timeout.txt", "false") == "true",
+        "reason": read_text_default(results_dir / "stderr.txt", status),
+        "results_dir": str(results_dir),
+    }
+    write_phase3_result_artifacts(scan_root, phase_result)
+    return phase_result
+
+
 def write_final_report(scan_root: Path) -> None:
     merged = load_json(scan_root / "merged_findings.json")
     verified = load_json(scan_root / "verified_findings.json")
@@ -579,6 +755,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-track-a-tools", action="store_true", help="Execute available Track A adapters instead of writing a skipped wrapper")
     parser.add_argument("--track-b-output", default="", help="Optional Track B fixture/model JSON output to map into findings")
     parser.add_argument("--action-gate", default="", help="Optional action gate JSON file for Phase 3 host-exception decisions")
+    parser.add_argument("--poc-dir", default="", help="Optional PoC directory to execute in the Phase 3 sandbox")
+    parser.add_argument("--poc-script", default="/poc/run.sh", help="PoC script path inside the sandbox container")
+    parser.add_argument("--poc-timeout", type=int, default=300, help="Phase 3 PoC timeout in seconds")
+    parser.add_argument("--poc-severity", default="medium", choices=["low", "medium", "high", "critical"], help="PoC impact level for action-gate approval")
+    parser.add_argument("--poc-approved", action="store_true", help="User approval for high/critical PoC execution")
+    parser.add_argument("--no-auto-rootfs-import", action="store_true", help="Do not auto-import the canonical rootfs before Phase 3")
     parser.add_argument("--track-b-dimension", default="dangerous_functions")
     parser.add_argument("--track-b-finding-id", default="TB-001")
     return parser.parse_args()
@@ -600,6 +782,7 @@ def main() -> int:
     try:
         update_phase(state, "preflight", "running")
         env = run_preflight(args, scan_root, package_type, package_path)
+        env = ensure_rootfs_imported(args, scan_root, package_type, package_path, env)
         update_phase(state, "preflight", "done")
         validate_or_fail(scan_root, "preflight")
         write_json(scan_root / "scan_state.json", state)
@@ -655,9 +838,17 @@ def main() -> int:
                         "ts": now_iso(),
                     })
             else:
-                write_phase3_artifacts(scan_root, [])
-                update_phase(state, "phase_3", "done")
-                state["phase_status"]["phase_3"]["execution_mode"] = "sandbox"
+                if args.poc_dir:
+                    phase3_result = run_phase3_sandbox(args, scan_root)
+                    if phase3_result.get("status") == "sandbox_error":
+                        raise RuntimeError("Phase 3 sandbox failed: " + str(phase3_result.get("reason", "sandbox_error")))
+                    update_phase(state, "phase_3", "done")
+                    state["phase_status"]["phase_3"]["execution_mode"] = "sandbox"
+                    state["phase_status"]["phase_3"]["poc_status"] = phase3_result.get("status", "unknown")
+                else:
+                    write_phase3_artifacts(scan_root, [])
+                    update_phase(state, "phase_3", "skipped", "No PoC directory configured for Phase 3")
+                    state["phase_status"]["phase_3"]["execution_mode"] = "sandbox"
         validate_or_fail(scan_root, "phase_3")
 
         update_phase(state, "phase_4", "running")

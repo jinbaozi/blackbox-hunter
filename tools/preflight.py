@@ -194,7 +194,7 @@ def reconcile_engine_phase_blocks(block_decision: dict[str, Any], engine: str) -
         phase_blocks.append({
             "phase": "phase_3",
             "tool": "docker",
-            "reason": "missing",
+            "reason": "daemon_unreachable",
         })
 
 

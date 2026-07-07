@@ -47,6 +47,26 @@ def test_checksec_adapter_outputs_hardening_signals() -> None:
         assert signal["promotion"]["requires_track_b"] is False
 
 
+def test_checksec_adapter_dedupes_binaries_and_uses_single_file_arg(tmp_path: Path) -> None:
+    binary = tmp_path / "usr" / "bin" / "demo"
+    binary.parent.mkdir(parents=True)
+    binary.write_bytes(b"\x7fELF")
+    duplicate = str(binary)
+    profile = {
+        "binaries": [
+            {"path": duplicate, "elf": True},
+            {"path": duplicate, "elf": True},
+            {"path": str(binary.parent / "script.sh"), "elf": False},
+        ]
+    }
+
+    commands = ChecksecAdapter().build_commands(profile, tmp_path / "scan")
+
+    assert len(commands) == 1
+    assert commands[0].argv == ["checksec", "--file", str(binary.resolve(strict=False))]
+    assert commands[0].argv.count("--file") == 1
+
+
 def test_cve_bin_tool_adapter_keeps_cve_as_signal() -> None:
     result = CveBinToolAdapter().parse_output(FIXTURES / "cve_bin_tool.json").to_json()
     assert len(result["signals"]) == 1
@@ -94,6 +114,10 @@ def test_dependency_parser_outputs_prioritization_signals() -> None:
 def run_all() -> None:
     test_yara_adapter_outputs_signals_not_findings()
     test_checksec_adapter_outputs_hardening_signals()
+    from tempfile import TemporaryDirectory
+
+    with TemporaryDirectory() as tmp:
+        test_checksec_adapter_dedupes_binaries_and_uses_single_file_arg(Path(tmp))
     test_cve_bin_tool_adapter_keeps_cve_as_signal()
     test_cwe_checker_adapter_requires_track_b()
     test_lintian_adapter_outputs_package_signals()
