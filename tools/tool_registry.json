@@ -1,1 +1,788 @@
-{"registry_version":3,"package_manager_priority":{"rpm":["dnf","microdnf","yum","zypper","rpm-ostree","apt","brew"],"deb":["apt","dnf","microdnf","yum","zypper","rpm-ostree","brew"]},"tools":[{"name":"cve-bin-tool","binary_name":"cve-bin-tool","execution_model":"host_binary","install_priority":["pipx","pip","manual"],"version_min":"3.0","install_cmds":{"manual":"Install cve-bin-tool with the package manager or upstream method approved for this environment."},"detect_cmd":"cve-bin-tool --version","upstream_url":"https://github.com/intel/cve-bin-tool","category":"cve_scan","priority":"required","fallbacks":["trivy","grype"],"platform":["linux","darwin"],"needs_network":true},{"name":"checksec","binary_name":"checksec","execution_model":"host_binary","install_priority":["dnf","microdnf","yum","zypper","apt","brew","pip","manual"],"version_min":"2.0","install_cmds":{"manual":"Install checksec with the package manager or upstream method approved for this environment."},"system_packages":{"dnf":["checksec"],"microdnf":["checksec"],"yum":["checksec"],"zypper":["checksec"],"apt":["checksec"],"brew":["checksec"]},"detect_cmd":"checksec --version","upstream_url":"https://github.com/slimm609/checksec","category":"hardening","priority":"required","fallbacks":["hardening-check"],"platform":["linux","darwin"],"needs_network":false},{"name":"rpm2cpio","binary_name":"rpm2cpio","execution_model":"host_binary","install_priority":["dnf","microdnf","yum","zypper","rpm-ostree","apt","brew","manual"],"install_cmds":{"manual":"Install rpm2cpio with the package manager or upstream method approved for this environment."},"system_packages":{"dnf":["rpm"],"microdnf":["rpm"],"yum":["rpm"],"zypper":["rpm"],"rpm-ostree":["rpm"],"apt":["rpm"],"brew":["rpm"]},"detect_cmd":"rpm2cpio --help","upstream_url":"https://rpm.org/","category":"package_extract","priority":"required","fallbacks":["7z","bsdtar"],"platform":["linux","darwin"],"applies_to":"rpm","needs_network":false,"detect_nonzero_ok":true},{"name":"rpm","binary_name":"rpm","execution_model":"host_binary","install_priority":["dnf","microdnf","yum","zypper","rpm-ostree","apt","brew","manual"],"install_cmds":{"manual":"Install rpm with the package manager or upstream method approved for this environment."},"system_packages":{"dnf":["rpm"],"microdnf":["rpm"],"yum":["rpm"],"zypper":["rpm"],"rpm-ostree":["rpm"],"apt":["rpm"],"brew":["rpm"]},"detect_cmd":"rpm --version","upstream_url":"https://rpm.org/","category":"package_metadata","priority":"medium","fallbacks":[],"platform":["linux","darwin"],"applies_to":"rpm","needs_network":false},{"name":"7z","binary_name":"7z","execution_model":"host_binary","install_priority":["dnf","microdnf","yum","zypper","apt","brew","manual"],"install_cmds":{"manual":"Install 7z with the package manager or upstream method approved for this environment."},"system_packages":{"dnf":["p7zip","p7zip-plugins"],"microdnf":["p7zip","p7zip-plugins"],"yum":["p7zip","p7zip-plugins"],"zypper":["p7zip"],"apt":["p7zip-full"],"brew":["p7zip"]},"detect_cmd":"7z","detect_nonzero_ok":true,"upstream_url":"https://www.7-zip.org/","category":"package_extract","priority":"medium","fallbacks":[],"platform":["linux","darwin"],"needs_network":false},{"name":"bsdtar","binary_name":"bsdtar","execution_model":"host_binary","install_priority":["dnf","microdnf","yum","zypper","apt","brew","manual"],"install_cmds":{"manual":"Install bsdtar with the package manager or upstream method approved for this environment."},"system_packages":{"dnf":["libarchive"],"microdnf":["libarchive"],"yum":["libarchive"],"zypper":["libarchive"],"apt":["libarchive-tools"],"brew":["libarchive"]},"detect_cmd":"bsdtar --version","upstream_url":"https://www.libarchive.org/","category":"package_extract","priority":"medium","fallbacks":[],"platform":["linux","darwin"],"needs_network":false},{"name":"cwe_checker","binary_name":"cwe_checker","execution_model":"container_image","container_engine":"docker","container_image":"fkiecad/cwe_checker","install_priority":["docker","manual"],"version_min":"0.7","install_cmds":{"manual":"Install cwe_checker with the package manager or upstream method approved for this environment."},"detect_cmd":"docker image inspect fkiecad/cwe_checker","upstream_url":"https://github.com/fkie-cad/cwe_checker","category":"binary_defect","priority":"high","fallbacks":["radare2"],"platform":["linux"],"needs_network":true},{"name":"binwalk","binary_name":"binwalk","execution_model":"host_binary","install_priority":["dnf","microdnf","yum","zypper","pipx","pip","brew","manual"],"version_min":"2.3","install_cmds":{"manual":"Install binwalk with the package manager or upstream method approved for this environment."},"system_packages":{"dnf":["binwalk"],"microdnf":["binwalk"],"yum":["binwalk"],"zypper":["binwalk"],"brew":["binwalk"]},"detect_cmd":"binwalk --version","upstream_url":"https://github.com/ReFirmLabs/binwalk","category":"file_analysis","priority":"medium","fallbacks":[],"platform":["linux","darwin"],"needs_network":true},{"name":"yara","binary_name":"yara","execution_model":"host_binary","install_priority":["dnf","microdnf","yum","zypper","apt","brew","manual"],"version_min":"4.0","install_cmds":{"manual":"Install yara with the package manager or upstream method approved for this environment."},"system_packages":{"dnf":["yara"],"microdnf":["yara"],"yum":["yara"],"zypper":["yara"],"apt":["yara"],"brew":["yara"]},"detect_cmd":"yara --version","upstream_url":"https://github.com/VirusTotal/yara","category":"pattern_scan","priority":"high","fallbacks":[],"platform":["linux","darwin"],"needs_network":false},{"name":"lintian","binary_name":"lintian","execution_model":"host_binary","install_priority":["apt","manual"],"version_min":"2.0","install_cmds":{"manual":"Install lintian with the package manager or upstream method approved for this environment."},"system_packages":{"apt":["lintian"]},"detect_cmd":"lintian --version","upstream_url":"https://github.com/Debian/lintian","category":"config_audit","priority":"high","fallbacks":[],"platform":["linux"],"applies_to":"deb","needs_network":false},{"name":"rpmlint","binary_name":"rpmlint","execution_model":"host_binary","install_priority":["dnf","microdnf","yum","zypper","apt","manual"],"version_min":"2.0","install_cmds":{"manual":"Install rpmlint with the package manager or upstream method approved for this environment."},"system_packages":{"dnf":["rpmlint"],"microdnf":["rpmlint"],"yum":["rpmlint"],"zypper":["rpmlint"],"apt":["rpmlint"]},"detect_cmd":"rpmlint --version","upstream_url":"https://github.com/rpm-software-management/rpmlint","category":"config_audit","priority":"high","fallbacks":[],"platform":["linux"],"applies_to":"rpm","needs_network":false},{"name":"radare2","binary_name":"r2","execution_model":"host_binary","install_priority":["dnf","microdnf","yum","zypper","apt","brew","manual"],"version_min":"5.0","install_cmds":{"manual":"Install radare2 with the package manager or upstream method approved for this environment."},"system_packages":{"dnf":["radare2"],"microdnf":["radare2"],"yum":["radare2"],"zypper":["radare2"],"apt":["radare2"],"brew":["radare2"]},"detect_cmd":"r2 -v","upstream_url":"https://github.com/radareorg/radare2","category":"disassembly","priority":"high","fallbacks":["objdump"],"platform":["linux","darwin"],"needs_network":false},{"name":"ghidra","binary_name":"analyzeHeadless","execution_model":"host_binary","install_priority":["snap","manual"],"version_min":"11.0","install_cmds":{"manual":"Install ghidra with the package manager or upstream method approved for this environment."},"detect_cmd":"which analyzeHeadless","upstream_url":"https://github.com/NationalSecurityAgency/ghidra","category":"disassembly","priority":"medium","fallbacks":["radare2","objdump"],"platform":["linux","darwin"],"needs_network":true},{"name":"docker","binary_name":"docker","execution_model":"host_binary","install_priority":["dnf","microdnf","yum","zypper","apt","manual"],"version_min":"20.0","install_cmds":{"manual":"Install docker with the package manager or upstream method approved for this environment."},"system_packages":{"dnf":["moby-engine"],"microdnf":["moby-engine"],"yum":["moby-engine"],"zypper":["docker"],"apt":["docker.io"]},"detect_cmd":"docker --version","upstream_url":"https://github.com/moby/moby","category":"sandbox","priority":"required_verify","fallbacks":["podman"],"platform":["linux"],"needs_network":true},{"name":"podman","binary_name":"podman","execution_model":"host_binary","install_priority":["dnf","microdnf","yum","zypper","apt","brew","manual"],"version_min":"4.0","install_cmds":{"manual":"Install podman with the package manager or upstream method approved for this environment."},"system_packages":{"dnf":["podman"],"microdnf":["podman"],"yum":["podman"],"zypper":["podman"],"apt":["podman"],"brew":["podman"]},"detect_cmd":"podman --version","upstream_url":"https://github.com/containers/podman","category":"sandbox","priority":"optional","fallbacks":[],"platform":["linux"],"needs_network":false}]}
+{
+  "package_manager_priority": {
+    "deb": [
+      "apt",
+      "dnf",
+      "microdnf",
+      "yum",
+      "zypper",
+      "rpm-ostree",
+      "brew"
+    ],
+    "rpm": [
+      "dnf",
+      "microdnf",
+      "yum",
+      "zypper",
+      "rpm-ostree",
+      "apt",
+      "brew"
+    ]
+  },
+  "registry_version": 3,
+  "tools": [
+    {
+      "binary_name": "cve-bin-tool",
+      "category": "cve_scan",
+      "detect_cmd": "cve-bin-tool --version",
+      "execution_model": "host_binary",
+      "fallbacks": [
+        "trivy",
+        "grype"
+      ],
+      "install_cmds": {
+        "manual": "Install cve-bin-tool with the package manager or upstream method approved for this environment."
+      },
+      "install_priority": [
+        "pipx",
+        "pip",
+        "manual"
+      ],
+      "name": "cve-bin-tool",
+      "needs_network": true,
+      "platform": [
+        "linux",
+        "darwin"
+      ],
+      "priority": "required",
+      "upstream_url": "https://github.com/intel/cve-bin-tool",
+      "version_min": "3.0"
+    },
+    {
+      "binary_name": "checksec",
+      "category": "hardening",
+      "detect_cmd": "checksec --version",
+      "execution_model": "host_binary",
+      "fallbacks": [
+        "hardening-check"
+      ],
+      "install_cmds": {
+        "manual": "Install checksec with the package manager or upstream method approved for this environment."
+      },
+      "install_priority": [
+        "dnf",
+        "microdnf",
+        "yum",
+        "zypper",
+        "apt",
+        "brew",
+        "pip",
+        "manual"
+      ],
+      "name": "checksec",
+      "needs_network": false,
+      "platform": [
+        "linux",
+        "darwin"
+      ],
+      "priority": "required",
+      "system_packages": {
+        "apt": [
+          "checksec"
+        ],
+        "brew": [
+          "checksec"
+        ],
+        "dnf": [
+          "checksec"
+        ],
+        "microdnf": [
+          "checksec"
+        ],
+        "yum": [
+          "checksec"
+        ],
+        "zypper": [
+          "checksec"
+        ]
+      },
+      "upstream_url": "https://github.com/slimm609/checksec",
+      "version_min": "2.0"
+    },
+    {
+      "applies_to": "rpm",
+      "binary_name": "rpm2cpio",
+      "category": "package_extract",
+      "detect_cmd": "rpm2cpio --help",
+      "detect_nonzero_ok": true,
+      "execution_model": "host_binary",
+      "fallbacks": [
+        "7z",
+        "bsdtar"
+      ],
+      "install_cmds": {
+        "manual": "Install rpm2cpio with the package manager or upstream method approved for this environment."
+      },
+      "install_priority": [
+        "dnf",
+        "microdnf",
+        "yum",
+        "zypper",
+        "rpm-ostree",
+        "apt",
+        "brew",
+        "manual"
+      ],
+      "name": "rpm2cpio",
+      "needs_network": false,
+      "platform": [
+        "linux",
+        "darwin"
+      ],
+      "priority": "required",
+      "system_packages": {
+        "apt": [
+          "rpm"
+        ],
+        "brew": [
+          "rpm"
+        ],
+        "dnf": [
+          "rpm"
+        ],
+        "microdnf": [
+          "rpm"
+        ],
+        "rpm-ostree": [
+          "rpm"
+        ],
+        "yum": [
+          "rpm"
+        ],
+        "zypper": [
+          "rpm"
+        ]
+      },
+      "upstream_url": "https://rpm.org/"
+    },
+    {
+      "applies_to": "rpm",
+      "binary_name": "rpm",
+      "category": "package_metadata",
+      "detect_cmd": "rpm --version",
+      "execution_model": "host_binary",
+      "fallbacks": [],
+      "install_cmds": {
+        "manual": "Install rpm with the package manager or upstream method approved for this environment."
+      },
+      "install_priority": [
+        "dnf",
+        "microdnf",
+        "yum",
+        "zypper",
+        "rpm-ostree",
+        "apt",
+        "brew",
+        "manual"
+      ],
+      "name": "rpm",
+      "needs_network": false,
+      "platform": [
+        "linux",
+        "darwin"
+      ],
+      "priority": "medium",
+      "system_packages": {
+        "apt": [
+          "rpm"
+        ],
+        "brew": [
+          "rpm"
+        ],
+        "dnf": [
+          "rpm"
+        ],
+        "microdnf": [
+          "rpm"
+        ],
+        "rpm-ostree": [
+          "rpm"
+        ],
+        "yum": [
+          "rpm"
+        ],
+        "zypper": [
+          "rpm"
+        ]
+      },
+      "upstream_url": "https://rpm.org/"
+    },
+    {
+      "binary_name": "7z",
+      "category": "package_extract",
+      "detect_cmd": "7z",
+      "detect_nonzero_ok": true,
+      "execution_model": "host_binary",
+      "fallbacks": [],
+      "install_cmds": {
+        "manual": "Install 7z with the package manager or upstream method approved for this environment."
+      },
+      "install_priority": [
+        "dnf",
+        "microdnf",
+        "yum",
+        "zypper",
+        "apt",
+        "brew",
+        "manual"
+      ],
+      "name": "7z",
+      "needs_network": false,
+      "platform": [
+        "linux",
+        "darwin"
+      ],
+      "priority": "medium",
+      "system_packages": {
+        "apt": [
+          "p7zip-full"
+        ],
+        "brew": [
+          "p7zip"
+        ],
+        "dnf": [
+          "p7zip",
+          "p7zip-plugins"
+        ],
+        "microdnf": [
+          "p7zip",
+          "p7zip-plugins"
+        ],
+        "yum": [
+          "p7zip",
+          "p7zip-plugins"
+        ],
+        "zypper": [
+          "p7zip"
+        ]
+      },
+      "upstream_url": "https://www.7-zip.org/"
+    },
+    {
+      "binary_name": "bsdtar",
+      "category": "package_extract",
+      "detect_cmd": "bsdtar --version",
+      "execution_model": "host_binary",
+      "fallbacks": [],
+      "install_cmds": {
+        "manual": "Install bsdtar with the package manager or upstream method approved for this environment."
+      },
+      "install_priority": [
+        "dnf",
+        "microdnf",
+        "yum",
+        "zypper",
+        "apt",
+        "brew",
+        "manual"
+      ],
+      "name": "bsdtar",
+      "needs_network": false,
+      "platform": [
+        "linux",
+        "darwin"
+      ],
+      "priority": "medium",
+      "system_packages": {
+        "apt": [
+          "libarchive-tools"
+        ],
+        "brew": [
+          "libarchive"
+        ],
+        "dnf": [
+          "libarchive"
+        ],
+        "microdnf": [
+          "libarchive"
+        ],
+        "yum": [
+          "libarchive"
+        ],
+        "zypper": [
+          "libarchive"
+        ]
+      },
+      "upstream_url": "https://www.libarchive.org/"
+    },
+    {
+      "binary_name": "cwe_checker",
+      "category": "binary_defect",
+      "container_engine": "docker",
+      "container_image": "fkiecad/cwe_checker",
+      "detect_cmd": "docker image inspect fkiecad/cwe_checker",
+      "execution_model": "container_image",
+      "fallbacks": [
+        "radare2"
+      ],
+      "install_cmds": {
+        "manual": "Install cwe_checker with the package manager or upstream method approved for this environment."
+      },
+      "install_priority": [
+        "docker",
+        "manual"
+      ],
+      "name": "cwe_checker",
+      "needs_network": true,
+      "platform": [
+        "linux"
+      ],
+      "priority": "high",
+      "upstream_url": "https://github.com/fkie-cad/cwe_checker",
+      "version_min": "0.7"
+    },
+    {
+      "binary_name": "binwalk",
+      "category": "file_analysis",
+      "detect_cmd": "binwalk --version",
+      "execution_model": "host_binary",
+      "fallbacks": [],
+      "install_cmds": {
+        "manual": "Install binwalk with the package manager or upstream method approved for this environment."
+      },
+      "install_priority": [
+        "dnf",
+        "microdnf",
+        "yum",
+        "zypper",
+        "pipx",
+        "pip",
+        "brew",
+        "manual"
+      ],
+      "name": "binwalk",
+      "needs_network": true,
+      "platform": [
+        "linux",
+        "darwin"
+      ],
+      "priority": "medium",
+      "system_packages": {
+        "brew": [
+          "binwalk"
+        ],
+        "dnf": [
+          "binwalk"
+        ],
+        "microdnf": [
+          "binwalk"
+        ],
+        "yum": [
+          "binwalk"
+        ],
+        "zypper": [
+          "binwalk"
+        ]
+      },
+      "upstream_url": "https://github.com/ReFirmLabs/binwalk",
+      "version_min": "2.3"
+    },
+    {
+      "binary_name": "yara",
+      "category": "pattern_scan",
+      "detect_cmd": "yara --version",
+      "execution_model": "host_binary",
+      "fallbacks": [],
+      "install_cmds": {
+        "manual": "Install yara with the package manager or upstream method approved for this environment."
+      },
+      "install_priority": [
+        "dnf",
+        "microdnf",
+        "yum",
+        "zypper",
+        "apt",
+        "brew",
+        "manual"
+      ],
+      "name": "yara",
+      "needs_network": false,
+      "platform": [
+        "linux",
+        "darwin"
+      ],
+      "priority": "high",
+      "system_packages": {
+        "apt": [
+          "yara"
+        ],
+        "brew": [
+          "yara"
+        ],
+        "dnf": [
+          "yara"
+        ],
+        "microdnf": [
+          "yara"
+        ],
+        "yum": [
+          "yara"
+        ],
+        "zypper": [
+          "yara"
+        ]
+      },
+      "upstream_url": "https://github.com/VirusTotal/yara",
+      "version_min": "4.0"
+    },
+    {
+      "applies_to": "deb",
+      "binary_name": "lintian",
+      "category": "config_audit",
+      "detect_cmd": "lintian --version",
+      "execution_model": "host_binary",
+      "fallbacks": [],
+      "install_cmds": {
+        "manual": "Install lintian with the package manager or upstream method approved for this environment."
+      },
+      "install_priority": [
+        "apt",
+        "manual"
+      ],
+      "name": "lintian",
+      "needs_network": false,
+      "platform": [
+        "linux"
+      ],
+      "priority": "high",
+      "system_packages": {
+        "apt": [
+          "lintian"
+        ]
+      },
+      "upstream_url": "https://github.com/Debian/lintian",
+      "version_min": "2.0"
+    },
+    {
+      "applies_to": "rpm",
+      "binary_name": "rpmlint",
+      "category": "config_audit",
+      "detect_cmd": "rpmlint --version",
+      "execution_model": "host_binary",
+      "fallbacks": [],
+      "install_cmds": {
+        "manual": "Install rpmlint with the package manager or upstream method approved for this environment."
+      },
+      "install_priority": [
+        "dnf",
+        "microdnf",
+        "yum",
+        "zypper",
+        "apt",
+        "manual"
+      ],
+      "name": "rpmlint",
+      "needs_network": false,
+      "platform": [
+        "linux"
+      ],
+      "priority": "high",
+      "system_packages": {
+        "apt": [
+          "rpmlint"
+        ],
+        "dnf": [
+          "rpmlint"
+        ],
+        "microdnf": [
+          "rpmlint"
+        ],
+        "yum": [
+          "rpmlint"
+        ],
+        "zypper": [
+          "rpmlint"
+        ]
+      },
+      "upstream_url": "https://github.com/rpm-software-management/rpmlint",
+      "version_min": "2.0"
+    },
+    {
+      "binary_name": "r2",
+      "category": "disassembly",
+      "detect_cmd": "r2 -v",
+      "execution_model": "host_binary",
+      "fallbacks": [
+        "objdump"
+      ],
+      "install_cmds": {
+        "manual": "Install radare2 with the package manager or upstream method approved for this environment."
+      },
+      "install_priority": [
+        "dnf",
+        "microdnf",
+        "yum",
+        "zypper",
+        "apt",
+        "brew",
+        "manual"
+      ],
+      "name": "radare2",
+      "needs_network": false,
+      "platform": [
+        "linux",
+        "darwin"
+      ],
+      "priority": "high",
+      "system_packages": {
+        "apt": [
+          "radare2"
+        ],
+        "brew": [
+          "radare2"
+        ],
+        "dnf": [
+          "radare2"
+        ],
+        "microdnf": [
+          "radare2"
+        ],
+        "yum": [
+          "radare2"
+        ],
+        "zypper": [
+          "radare2"
+        ]
+      },
+      "upstream_url": "https://github.com/radareorg/radare2",
+      "version_min": "5.0"
+    },
+    {
+      "binary_name": "analyzeHeadless",
+      "category": "disassembly",
+      "detect_cmd": "which analyzeHeadless",
+      "execution_model": "host_binary",
+      "fallbacks": [
+        "radare2",
+        "objdump"
+      ],
+      "install_cmds": {
+        "manual": "Install ghidra with the package manager or upstream method approved for this environment."
+      },
+      "install_priority": [
+        "snap",
+        "manual"
+      ],
+      "name": "ghidra",
+      "needs_network": true,
+      "platform": [
+        "linux",
+        "darwin"
+      ],
+      "priority": "medium",
+      "upstream_url": "https://github.com/NationalSecurityAgency/ghidra",
+      "version_min": "11.0"
+    },
+    {
+      "binary_name": "docker",
+      "category": "sandbox",
+      "detect_cmd": "docker --version",
+      "execution_model": "host_binary",
+      "fallbacks": [
+        "podman"
+      ],
+      "install_cmds": {
+        "manual": "Install docker with the package manager or upstream method approved for this environment."
+      },
+      "install_priority": [
+        "dnf",
+        "microdnf",
+        "yum",
+        "zypper",
+        "apt",
+        "manual"
+      ],
+      "name": "docker",
+      "needs_network": true,
+      "platform": [
+        "linux"
+      ],
+      "priority": "required_verify",
+      "system_packages": {
+        "apt": [
+          "docker.io"
+        ],
+        "dnf": [
+          "moby-engine"
+        ],
+        "microdnf": [
+          "moby-engine"
+        ],
+        "yum": [
+          "moby-engine"
+        ],
+        "zypper": [
+          "docker"
+        ]
+      },
+      "upstream_url": "https://github.com/moby/moby",
+      "version_min": "20.0"
+    },
+    {
+      "binary_name": "podman",
+      "category": "sandbox",
+      "detect_cmd": "podman --version",
+      "execution_model": "host_binary",
+      "fallbacks": [],
+      "install_cmds": {
+        "manual": "Install podman with the package manager or upstream method approved for this environment."
+      },
+      "install_priority": [
+        "dnf",
+        "microdnf",
+        "yum",
+        "zypper",
+        "apt",
+        "brew",
+        "manual"
+      ],
+      "name": "podman",
+      "needs_network": false,
+      "platform": [
+        "linux"
+      ],
+      "priority": "optional",
+      "system_packages": {
+        "apt": [
+          "podman"
+        ],
+        "brew": [
+          "podman"
+        ],
+        "dnf": [
+          "podman"
+        ],
+        "microdnf": [
+          "podman"
+        ],
+        "yum": [
+          "podman"
+        ],
+        "zypper": [
+          "podman"
+        ]
+      },
+      "upstream_url": "https://github.com/containers/podman",
+      "version_min": "4.0"
+    },
+    {
+      "applies_to": [
+        "rpm",
+        "deb"
+      ],
+      "binary_name": "objdump",
+      "category": "disassembly",
+      "detect_cmd": "objdump --version || llvm-objdump --version",
+      "execution_model": "host_binary",
+      "fallbacks": [
+        "readelf"
+      ],
+      "install_cmds": {
+        "manual": "Install binutils (provides objdump) or llvm (provides llvm-objdump)."
+      },
+      "install_priority": [
+        "manual"
+      ],
+      "name": "objdump",
+      "needs_network": false,
+      "platform": [
+        "linux",
+        "darwin"
+      ],
+      "priority": "high",
+      "system_packages": {
+        "apt": [
+          "binutils"
+        ],
+        "brew": [
+          "binutils"
+        ],
+        "dnf": [
+          "binutils"
+        ],
+        "microdnf": [
+          "binutils"
+        ],
+        "yum": [
+          "binutils"
+        ]
+      },
+      "upstream_url": "https://sourceware.org/binutils/"
+    },
+    {
+      "binary_name": "afl-fuzz",
+      "category": "fuzz",
+      "container_engine": "docker",
+      "container_image": "bbh-fuzz:local-imported",
+      "detect_cmd": "docker image inspect bbh-fuzz:local-imported",
+      "execution_model": "container_image",
+      "fallbacks": [
+        "libfuzzer",
+        "honggfuzz"
+      ],
+      "install_cmds": {
+        "manual": "Build bbh-fuzz:local-imported from sandbox/Dockerfile.fuzz."
+      },
+      "install_priority": [
+        "manual"
+      ],
+      "name": "afl",
+      "needs_network": false,
+      "platform": [
+        "linux"
+      ],
+      "priority": "optional",
+      "upstream_url": "https://github.com/AFLplusplus/AFLplusplus"
+    },
+    {
+      "binary_name": "clang",
+      "category": "fuzz",
+      "container_engine": "docker",
+      "container_image": "bbh-fuzz:local-imported",
+      "detect_cmd": "docker image inspect bbh-fuzz:local-imported",
+      "execution_model": "container_image",
+      "fallbacks": [
+        "afl",
+        "honggfuzz"
+      ],
+      "install_cmds": {
+        "manual": "Build bbh-fuzz:local-imported from sandbox/Dockerfile.fuzz."
+      },
+      "install_priority": [
+        "manual"
+      ],
+      "name": "libfuzzer",
+      "needs_network": false,
+      "platform": [
+        "linux"
+      ],
+      "priority": "optional",
+      "upstream_url": "https://llvm.org/docs/LibFuzzer.html"
+    },
+    {
+      "binary_name": "honggfuzz",
+      "category": "fuzz",
+      "container_engine": "docker",
+      "container_image": "bbh-fuzz:local-imported",
+      "detect_cmd": "docker image inspect bbh-fuzz:local-imported",
+      "execution_model": "container_image",
+      "fallbacks": [
+        "afl",
+        "libfuzzer"
+      ],
+      "install_cmds": {
+        "manual": "Build bbh-fuzz:local-imported from sandbox/Dockerfile.fuzz."
+      },
+      "install_priority": [
+        "manual"
+      ],
+      "name": "honggfuzz",
+      "needs_network": false,
+      "platform": [
+        "linux"
+      ],
+      "priority": "optional",
+      "upstream_url": "https://github.com/google/honggfuzz"
+    }
+  ]
+}

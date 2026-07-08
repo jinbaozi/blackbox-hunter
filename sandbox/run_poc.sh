@@ -5,6 +5,18 @@ POC_SCRIPT="${POC_SCRIPT:-/poc/run.sh}"
 TIMEOUT="${TIMEOUT:-300}"
 OUTPUT_DIR="${OUTPUT_DIR:-/workspace/results}"
 MONITOR_INTERVAL="${MONITOR_INTERVAL:-1}"
+# B8: SANITIZER=asan|msan|ubsan|none. The orchestrator sets this; we just
+# forward it into the environment so the PoC run.sh can pick the right
+# instrumented binary. MSan is intentionally unsupported because the
+# imported rootfs doesn't ship an MSan-instrumented libc.
+SANITIZER="${SANITIZER:-none}"
+export SANITIZER
+# B8: defaults that match sandbox/docker-compose.sandbox.yml. These are
+# forwarded verbatim into the PoC process environment so the instrumented
+# binary inherits them.
+export ASAN_OPTIONS="${ASAN_OPTIONS:-abort_on_error=1:detect_leaks=1:exitcode=42}"
+export MSAN_OPTIONS="${MSAN_OPTIONS:-exitcode=77}"
+export UBSAN_OPTIONS="${UBSAN_OPTIONS:-halt_on_error=1:print_stacktrace=1:exitcode=1}"
 mkdir -p "$OUTPUT_DIR"
 
 case "$TIMEOUT" in
@@ -34,6 +46,42 @@ write_result() {
   echo "$exit_code" > "$OUTPUT_DIR/exit_code.txt"
   echo "$timed_out" > "$OUTPUT_DIR/timeout.txt"
   echo "$status" > "$OUTPUT_DIR/status.txt"
+}
+
+# B3: detect when the sandbox itself blocked the operation (network_mode:none,
+# seccomp, AppArmor, missing caps) vs. the PoC genuinely failing. Writes the
+# matched kind to sandbox_imposed_failure.txt so the result interpreter can
+# distinguish sandbox_blocked (poc_status) from failed / inconclusive.
+detect_sandbox_failure() {
+  local stderr_file="$OUTPUT_DIR/stderr.txt"
+  local stdout_file="$OUTPUT_DIR/stdout.txt"
+  [ -r "$stderr_file" ] || return 0
+  # bind_blocked
+  if grep -qE 'Address family not supported|Address already in use|Permission denied \(bind\)|bind: cannot assign requested address' "$stderr_file" "$stdout_file" 2>/dev/null; then
+    echo "bind_blocked" > "$OUTPUT_DIR/sandbox_imposed_failure.txt"
+    return 0
+  fi
+  # connect_blocked
+  if grep -qE 'Permission denied \(connect\)|connect: operation not permitted' "$stderr_file" "$stdout_file" 2>/dev/null; then
+    echo "connect_blocked" > "$OUTPUT_DIR/sandbox_imposed_failure.txt"
+    return 0
+  fi
+  # socket_blocked
+  if grep -qE 'socket: operation not permitted|Protocol not available' "$stderr_file" "$stdout_file" 2>/dev/null; then
+    echo "socket_blocked" > "$OUTPUT_DIR/sandbox_imposed_failure.txt"
+    return 0
+  fi
+  # route_blocked
+  if grep -qE 'Network is unreachable|No route to host' "$stderr_file" "$stdout_file" 2>/dev/null; then
+    echo "route_blocked" > "$OUTPUT_DIR/sandbox_imposed_failure.txt"
+    return 0
+  fi
+  # dns_blocked
+  if grep -qE 'Name or service not known|Temporary failure in name resolution|Name does not resolve' "$stderr_file" "$stdout_file" 2>/dev/null; then
+    echo "dns_blocked" > "$OUTPUT_DIR/sandbox_imposed_failure.txt"
+    return 0
+  fi
+  return 0
 }
 
 stop_process() {
@@ -106,5 +154,10 @@ fi
 
 write_state post_state
 write_result "$EXIT_CODE" "$TIMED_OUT" "$STATUS"
+
+# B3: detect sandbox-imposed failures (bind/route/dns etc) after the run.
+# The result interpreter reads sandbox_imposed_failure.txt to set
+# poc_status=sandbox_blocked (preserves static finding without demotion).
+detect_sandbox_failure || true
 
 exit "$EXIT_CODE"

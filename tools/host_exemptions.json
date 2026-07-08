@@ -39,6 +39,34 @@
       ],
       "requires_reason_field": true,
       "requires_user_approval": true
+    },
+    {
+      "id": "host-ltrace",
+      "description": "Run ltrace inside the sandbox against the PoC reproducer. ltrace reads /proc/<pid>/mem only for processes in the same sandbox PID namespace, so the target_is_target_package flag stays false.",
+      "category": "dynamic_tracing",
+      "applies_to": ["phase_3"],
+      "target_is_target_package": false,
+      "conditions": [
+        "ltrace is invoked from within the PoC sandbox",
+        "target pids belong to the PoC sandbox PID namespace",
+        "PoC reproducer itself runs in the sandbox"
+      ],
+      "requires_reason_field": true,
+      "requires_user_approval": true
+    },
+    {
+      "id": "host-strace-fork",
+      "description": "Run strace -f against the PoC reproducer fork tree to capture execve/exit syscalls emitted by gcc/cc1 wrapper chains. Seccomp still blocks dangerous syscalls; this exemption only widens observation, not privileges.",
+      "category": "dynamic_tracing",
+      "applies_to": ["phase_3"],
+      "target_is_target_package": false,
+      "conditions": [
+        "strace -f traces the PoC reproducer PID tree",
+        "no ptrace of processes outside the PoC sandbox",
+        "PoC reproducer itself runs in the sandbox"
+      ],
+      "requires_reason_field": true,
+      "requires_user_approval": true
     }
   ]
 }

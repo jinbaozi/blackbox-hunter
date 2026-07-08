@@ -29,6 +29,10 @@ POC_STATUS_TO_VERIFICATION = {
     "inconclusive": 0.50,
     "poc_error": 0.50,
     "sandbox_error": 0.50,
+    # B3: sandbox_blocked is treated as verification UNKNOWN (not failed).
+    # The static finding is preserved; we just can't prove/disprove with a
+    # PoC because the sandbox wouldn't let it run.
+    "sandbox_blocked": 0.50,
 }
 
 
@@ -142,7 +146,7 @@ def compute_confidence_breakdown(
     tool = clamp(tool)
 
     verification = POC_STATUS_TO_VERIFICATION.get(poc_status(finding), 0.50)
-    if poc_status(finding) in {"poc_error", "sandbox_error"}:
+    if poc_status(finding) in {"poc_error", "sandbox_error", "sandbox_blocked"}:
         adjustments.append(f"{poc_status(finding)} treated as verification unknown, not false positive")
     elif poc_status(finding) == "verified":
         adjustments.append("PoC verified signal observed")

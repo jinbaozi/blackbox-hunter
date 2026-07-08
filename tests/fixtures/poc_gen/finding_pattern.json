@@ -1,0 +1,25 @@
+{
+  "finding_id": "TA-004",
+  "finding_status": "candidate",
+  "vulnerability": {
+    "title": "Version banner leaks build info (fixture)",
+    "severity": "info",
+    "confidence": 0.45
+  },
+  "location": {
+    "binary": "/bin/echo"
+  },
+  "evidence": {
+    "description": "Pattern fixture: PoC should match a string on stdout",
+    "pattern": "BLACKBOX_TEST_PATTERN_OK",
+    "reproduction_hint": "echo BLACKBOX_TEST_PATTERN_OK"
+  },
+  "attack_surface": {
+    "type": "cli",
+    "entry_point": "BLACKBOX_TEST_PATTERN_OK"
+  },
+  "verification": {
+    "poc_status": "untested",
+    "expected_signal": {"type": "pattern", "pattern": "BLACKBOX_TEST_PATTERN_OK"}
+  }
+}

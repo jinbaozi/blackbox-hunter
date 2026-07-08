@@ -15,11 +15,13 @@ python3 -m py_compile \
   tools/adapters/rpmlint.py \
   tools/adapters/yara_scan.py \
   tools/context/action_gate.py \
+  tools/context/agent_loop.py \
   tools/context/context_manifest.py \
   tools/context/evidence_trimmer.py \
   tools/context/injection_filter.py \
   tools/context/prompt_builder.py \
   tools/context/token_budget.py \
+  tools/context/track_b_executor.py \
   tools/context/track_b_output_mapper.py \
   tools/merge/confidence_scoring.py \
   tools/merge/merge_runner.py \

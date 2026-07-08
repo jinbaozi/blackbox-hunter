@@ -756,14 +756,25 @@ def main() -> int:
             report["block_decision"].setdefault("warnings", []).append(reason_msg)
         print(f"ERROR: {reason_msg}", file=sys.stderr)
     elif rootfs["rootfs_status"] in ("not_imported", "stale"):
+        # B10: stale or not_imported rootfs now hard-blocks the scan. The scan
+        # cannot safely run Phase 3 PoC verification without a known rootfs
+        # image. We surface the remediation command and an explicit phase block.
+        # Set STALE_BLOCKS_SCAN=0 to opt back into the legacy warning-only
+        # behaviour (not recommended in production).
         reason_msg = "rootfs image is not imported. Run: python3 tools/import_rootfs.py --tarball assets/rootfs/v11-2503-rootfs.tar"
+        if rootfs["rootfs_status"] == "stale":
+            reason_msg = f"rootfs_image_stale: re-run python3 tools/import_rootfs.py (or set STALE_BLOCKS_SCAN=0 to keep warning-only behaviour)"
+        stale_blocks_scan = os.environ.get("STALE_BLOCKS_SCAN", "1") != "0"
+        report["block_decision"]["blocked"] = bool(stale_blocks_scan)
+        report["block_decision"]["reason"] = reason_msg
+        report["block_decision"]["stale_blocks_scan"] = bool(stale_blocks_scan)
         if not any("import_rootfs.py" in warning for warning in report["block_decision"].get("warnings", [])):
             report["block_decision"].setdefault("warnings", []).append(reason_msg)
         if not any(block.get("phase") == "phase_3" and block.get("tool") == "rootfs" for block in report["block_decision"].get("phase_blocks", [])):
             report["block_decision"].setdefault("phase_blocks", []).append({
                 "phase": "phase_3",
                 "tool": "rootfs",
-                "reason": "not_imported",
+                "reason": rootfs["rootfs_status"],
             })
 
     out_path.parent.mkdir(parents=True, exist_ok=True)

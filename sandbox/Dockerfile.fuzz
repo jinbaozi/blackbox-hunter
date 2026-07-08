@@ -1,0 +1,83 @@
+# BlackBox Hunter - Fuzz Sandbox (B7)
+#
+# This image is separate from `bbh-poc-sandbox` because fuzzing imposes
+# requirements that conflict with the regular PoC sandbox:
+#
+#   * afl-fuzz needs read-write access to its queues and ptrace access
+#     to the target. We therefore do NOT apply the same seccomp profile
+#     used by `Dockerfile.poc`.
+#   * honggfuzz needs a kernel that allows its persistent mode. We
+#     accept that on hosts where this is denied.
+#   * libFuzzer runs in-process and writes its corpus next to the
+#     harness; we mount a dedicated /corpus volume for that.
+#
+# Build:    docker build -t bbh-fuzz:local-imported -f Dockerfile.fuzz .
+# Use:      docker run --rm -v $PWD/corpus:/corpus bbh-fuzz:local-imported \
+#                 --engine libfuzzer --harness /harness/fuzz_target.c \
+#                 --duration-sec 60
+#
+# The image is *only* used by the `afl`, `libfuzzer`, `honggfuzz`
+# entries in `tools/tool_registry.json` (B7 contract).
+
+FROM bbh-base:local-imported
+
+USER root
+
+RUN set -eux; \
+    deb_core_tools="bash coreutils findutils procps python3 file binutils make"; \
+    rpm_core_tools="bash coreutils findutils procps-ng python3 file binutils make"; \
+    # B7: fuzz engines. We install all three so the orchestrator can pick
+    # whichever is available in the base image. Install is best-effort:
+    # a missing package must not abort the build.
+    deb_fuzz_tools="afl++ clang llvm lld"; \
+    rpm_fuzz_tools="afl++ clang llvm lld"; \
+    # B8: sanitizer runtime (also needed by libFuzzer for address-mode
+    # coverage). Already declared in Dockerfile.poc but we duplicate here
+    # so this image can be built standalone.
+    deb_sanitizer_tools="compiler-rt libubsan1 libasan6 libstdc++6"; \
+    rpm_sanitizer_tools="compiler-rt libubsan libasan libstdc++"; \
+    if command -v apt-get >/dev/null 2>&1; then \
+        apt-get update; \
+        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $deb_core_tools || true; \
+        for t in $deb_fuzz_tools; do DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$t" || true; done; \
+        for t in $deb_sanitizer_tools; do DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$t" || true; done; \
+        rm -rf /var/lib/apt/lists/*; \
+    elif command -v dnf >/dev/null 2>&1; then \
+        dnf install -y $rpm_core_tools || true; \
+        for t in $rpm_fuzz_tools; do dnf install -y "$t" || true; done; \
+        for t in $rpm_sanitizer_tools; do dnf install -y "$t" || true; done; \
+        dnf clean all; \
+    elif command -v microdnf >/dev/null 2>&1; then \
+        microdnf install -y $rpm_core_tools || true; \
+        for t in $rpm_fuzz_tools; do microdnf install -y "$t" || true; done; \
+        for t in $rpm_sanitizer_tools; do microdnf install -y "$t" || true; done; \
+        microdnf clean all; \
+    elif command -v yum >/dev/null 2>&1; then \
+        yum install -y $rpm_core_tools || true; \
+        for t in $rpm_fuzz_tools; do yum install -y "$t" || true; done; \
+        for t in $rpm_sanitizer_tools; do yum install -y "$t" || true; done; \
+        yum clean all; \
+    fi
+
+# Set up the fuzz workspace. Unlike the PoC sandbox we mount /corpus
+# read-write because fuzz engines need to write new inputs.
+RUN set -eux; \
+    mkdir -p /corpus /harness /results; \
+    chmod 0777 /corpus /harness /results; \
+    if ! id -u fuzz >/dev/null 2>&1; then \
+        useradd -m -s /bin/bash fuzz; \
+    fi
+
+# B7: copy the fuzz orchestrator scripts into the image so the host can
+# invoke them by name (without bind-mounting).
+COPY fuzz_runner.sh /opt/fuzz_runner.sh
+RUN chmod +x /opt/fuzz_runner.sh
+
+USER fuzz
+WORKDIR /home/fuzz
+VOLUME ["/corpus", "/results"]
+
+# Default to the orchestrator; users override --engine / --harness on
+# the docker CLI.
+ENTRYPOINT ["/opt/fuzz_runner.sh"]
+CMD ["--help"]

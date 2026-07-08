@@ -10,6 +10,35 @@ from typing import Any
 
 MAX_OUTPUT_READ_BYTES = 1024 * 1024
 
+# Maps stderr/stdout markers that a sandbox imposes to a normalised
+# sandbox_imposed_failure kind. The PoC runner writes the matched key to
+# ``$OUTPUT_DIR/sandbox_imposed_failure.txt``; the interpreter then maps the
+# ``runner_result.sandbox_imposed_failure`` value to ``poc_status="sandbox_blocked"``.
+SANDBOX_FAILURE_MARKERS: dict[str, tuple[str, ...]] = {
+    "bind_blocked": (
+        "Address family not supported by protocol",
+        "Address already in use",
+        "Permission denied (bind)",
+        "bind: cannot assign requested address",
+    ),
+    "connect_blocked": (
+        "Permission denied (connect)",
+        "connect: operation not permitted",
+    ),
+    "socket_blocked": (
+        "socket: operation not permitted",
+        "Protocol not available",
+    ),
+    "route_blocked": (
+        "Network is unreachable",
+        "No route to host",
+    ),
+    "dns_blocked": (
+        "Name or service not known",
+        "Temporary failure in name resolution",
+    ),
+}
+
 
 @dataclass
 class ExpectedSignal:
@@ -36,9 +65,13 @@ class RunnerResult:
     result_dir: str | None = None
     failure_reason: str | None = None
     crash_signal: str | None = None
+    sandbox_imposed_failure: str | None = None
 
     @classmethod
     def from_json(cls, payload: dict[str, Any]) -> "RunnerResult":
+        sandbox_failure = payload.get("sandbox_imposed_failure")
+        if sandbox_failure is not None:
+            sandbox_failure = str(sandbox_failure) if sandbox_failure else None
         return cls(
             status=str(payload.get("status", "")),
             exit_code=int(payload.get("exit_code", 0)),
@@ -51,6 +84,7 @@ class RunnerResult:
             result_dir=payload.get("result_dir"),
             failure_reason=payload.get("failure_reason"),
             crash_signal=payload.get("crash_signal"),
+            sandbox_imposed_failure=sandbox_failure,
         )
 
 
@@ -121,6 +155,14 @@ def interpret_result(expected: ExpectedSignal, runner: RunnerResult) -> Verifica
         return _decision("sandbox_error", "confirmed_static", runner.failure_reason or "sandbox infrastructure failed", runner, evidence)
     if status == "poc_error":
         return _decision("poc_error", "confirmed_static", runner.failure_reason or "PoC artifact failed before exercising target", runner, evidence)
+    if runner.sandbox_imposed_failure:
+        # B3: when the sandbox itself blocked the operation (bind, route, dns,
+        # etc.) we record a new poc_status="sandbox_blocked" while keeping
+        # finding_status=confirmed_static. This way the static finding is
+        # preserved and never mis-classified as inconclusive / false_positive.
+        kind = runner.sandbox_imposed_failure
+        reason = f"Sandbox blocked the PoC ({kind}); static finding preserved without demotion"
+        return _decision("sandbox_blocked", "confirmed_static", reason, runner, evidence)
     if runner.timeout:
         if expected.type == "timeout":
             return _decision("verified", "verified", "expected timeout/hang signal observed", runner, evidence)

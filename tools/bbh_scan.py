@@ -375,6 +375,36 @@ def build_phase0(args: argparse.Namespace, scan_root: Path, package_path: Path, 
         raise RuntimeError("; ".join(warnings))
 
     binaries, attack_surface, architectures = collect_inventory(extracted)
+    # B4: classify each ELF binary into a backend_role (wrapper vs
+    # compiler_driver vs frontend vs runtime_helper vs ...). The
+    # classifier never executes the binary; it inspects headers and a
+    # bounded disassembly slice.
+    try:
+        from tools.profile.elf_classify import classify
+        for binary in binaries:
+            try:
+                info = classify(binary["path"])
+            except Exception:
+                continue
+            binary["backend_role"] = info["backend_role"]
+            binary["is_wrapper"] = info["is_wrapper"]
+            binary["execve_target"] = info["execve_target"]
+    except ImportError:
+        pass
+    # B5: model the compiler pipeline (cc1 -> as -> ld, LTO/whole-program).
+    # Always emitted because it's cheap (no exec). pipeline_mode eager is
+    # honoured by the orchestrator's Phase 3 sandbox.
+    try:
+        from tools.pipeline.pipeline_model import model as pipeline_model
+        pipeline = pipeline_model({"binaries": binaries})
+    except Exception:
+        pipeline = None
+    # B6: detect bundled language runtimes (libgomp, libgfortran, ...).
+    try:
+        from tools.runtime.stress_runner import detect_runtimes
+        detected_runtimes = detect_runtimes(extracted)
+    except Exception:
+        detected_runtimes = []
     profile = {
         "scan_id": args.scan_id,
         "package": {
@@ -389,6 +419,17 @@ def build_phase0(args: argparse.Namespace, scan_root: Path, package_path: Path, 
         "binaries": binaries,
         "attack_surface": attack_surface,
         "architectures": architectures,
+        # B5: optional pipeline object
+        **({"pipeline": pipeline} if pipeline else {}),
+        # B6: detected language runtimes
+        **({"detected_runtimes": detected_runtimes} if detected_runtimes else {}),
+        # B7: fuzz_config is populated only when --enable-fuzz is set;
+        # otherwise duration_sec=0 keeps the fuzz adapter dormant.
+        "fuzz_config": {
+            "engine": getattr(args, "fuzz_engine", "libfuzzer"),
+            "duration_sec": int(getattr(args, "fuzz_duration_sec", 60)) if getattr(args, "enable_fuzz", False) else 0,
+            "asan_flags": "abort_on_error=1:detect_leaks=1:exitcode=42",
+        },
         "metadata": {"package_manager": env.get("package_manager", "unknown")},
     }
     write_json(scan_root / "target_profile.json", profile)
@@ -435,7 +476,7 @@ def available_track_a_adapter_names(env: dict[str, Any]) -> list[str]:
     return [name for name in available if name in TRACK_A_ADAPTERS]
 
 
-def write_skipped_track_a(scan_root: Path, reason: str) -> None:
+def write_skipped_track_a(scan_root: Path, reason: str, *, skipped_reason: str = "unspecified") -> None:
     (scan_root / "raw" / "track_a").mkdir(parents=True, exist_ok=True)
     write_json(scan_root / "track_a_findings.json", {
         "agent_id": "track-a-toolscan",
@@ -446,7 +487,13 @@ def write_skipped_track_a(scan_root: Path, reason: str) -> None:
         "findings_count": 0,
         "warnings": [reason],
         "execution_time_ms": 0,
-        "metadata": {"tools_executed": [], "tool_results": [], "signals_count": 0, "signals_promoted": 0},
+        "metadata": {
+            "tools_executed": [],
+            "tool_results": [],
+            "signals_count": 0,
+            "signals_promoted": 0,
+            "skipped_reason": skipped_reason,
+        },
     })
 
 
@@ -505,14 +552,24 @@ def write_skipped_track_b(scan_root: Path, args: argparse.Namespace) -> None:
 
 def write_track_outputs(scan_root: Path, env: dict[str, Any], args: argparse.Namespace) -> None:
     (scan_root / "raw" / "track_a").mkdir(parents=True, exist_ok=True)
-    if args.run_track_a_tools:
+    should_run_track_a = _should_run_track_a(args)
+    if should_run_track_a:
         selected = available_track_a_adapter_names(env)
         if selected:
             run_track_a(scan_root, env, load_json(scan_root / "target_profile.json"), selected)
         else:
-            write_skipped_track_a(scan_root, "Track A tool execution requested but no available Track A adapters were detected")
+            write_skipped_track_a(
+                scan_root,
+                "Track A tool execution requested but no available Track A adapters were detected",
+                skipped_reason="no_adapters_available",
+            )
     else:
-        write_skipped_track_a(scan_root, "Track A tool execution disabled; use --run-track-a-tools to execute available adapters")
+        skipped_reason = _track_a_skipped_reason(args)
+        write_skipped_track_a(
+            scan_root,
+            f"Track A tool execution skipped: {skipped_reason}",
+            skipped_reason=skipped_reason,
+        )
 
     if args.track_b_output:
         write_track_b_from_output(scan_root, args)
@@ -520,7 +577,31 @@ def write_track_outputs(scan_root: Path, env: dict[str, Any], args: argparse.Nam
         write_skipped_track_b(scan_root, args)
 
 
-def write_merge_verify_artifacts(scan_root: Path, sid: str, env: dict[str, Any]) -> None:
+def _should_run_track_a(args: argparse.Namespace) -> bool:
+    """Decide whether Track A should run based on flags and mode.
+
+    Resolution order:
+        1. ``--run-track-a-tools`` always wins (explicit opt-in, back-compat).
+        2. ``--skip-track-a`` always wins (explicit opt-out).
+        3. Default: run for ``standard`` / ``deep`` / ``full``; skip for ``quick``.
+    """
+    if getattr(args, "run_track_a_tools", False):
+        return True
+    if getattr(args, "skip_track_a", False):
+        return False
+    return getattr(args, "mode", "quick") != "quick"
+
+
+def _track_a_skipped_reason(args: argparse.Namespace) -> str:
+    """Human-readable reason for skipping Track A (recorded in ``metadata.skipped_reason``)."""
+    if getattr(args, "skip_track_a", False):
+        return "explicit_skip_track_a_flag"
+    if getattr(args, "mode", "quick") == "quick":
+        return "mode_quick_default_skip"
+    return "unknown"
+
+
+def write_merge_verify_artifacts(scan_root: Path, sid: str, env: dict[str, Any], registry_path: str | None = None) -> None:
     track_a = load_json(scan_root / "track_a_findings.json")
     track_b = load_json(scan_root / "track_b_findings.json")
     merged = merge_findings(track_a, track_b)
@@ -528,14 +609,30 @@ def write_merge_verify_artifacts(scan_root: Path, sid: str, env: dict[str, Any])
     write_json(scan_root / "merged_findings.json", merged)
 
     profile = load_json(scan_root / "target_profile.json")
-    coverage = {
-        "binary_coverage_pct": 100 if profile.get("binaries") is not None else 0,
-        "config_coverage_pct": 100,
-        "dependency_coverage_pct": 0,
-        "attack_surface_coverage_pct": 100 if profile.get("attack_surface") is not None else 0,
-        "tool_coverage_pct": 100 if track_a.get("metadata", {}).get("tools_executed") else 0,
-        "gaps": env.get("block_decision", {}).get("phase_blocks", []),
-    }
+    # A3: derive coverage from real scan artifacts instead of the hand-written
+    # 5-line heuristic. The fallback remains identical for fixtures that
+    # don't expose the structured inputs.
+    try:
+        from tools.coverage.derive_coverage import compute as derive_coverage
+        registry_tools = None
+        if registry_path:
+            try:
+                import json as _json
+                reg = _json.loads(Path(registry_path).read_text(encoding="utf-8"))
+                registry_tools = [t.get("name") for t in reg.get("tools") or [] if t.get("name")]
+            except (OSError, ValueError):
+                registry_tools = None
+        coverage = derive_coverage(track_a, track_b, profile, env, registry_tools=registry_tools)
+    except Exception:
+        # Fallback for fixtures that don't have all the structured inputs.
+        coverage = {
+            "binary_coverage_pct": 100 if profile.get("binaries") is not None else 0,
+            "config_coverage_pct": 100,
+            "dependency_coverage_pct": 0,
+            "attack_surface_coverage_pct": 100 if profile.get("attack_surface") is not None else 0,
+            "tool_coverage_pct": 100 if track_a.get("metadata", {}).get("tools_executed") else 0,
+            "gaps": env.get("block_decision", {}).get("phase_blocks", []),
+        }
     write_json(scan_root / "coverage_report.json", coverage)
 
 
@@ -749,10 +846,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--package", required=True, dest="package_path")
     parser.add_argument("--workspace", default="")
     parser.add_argument("--mode", default="quick", choices=["quick", "standard", "deep", "full"])
+    # B5: pipeline modelling is lazy by default (cheap, never executes
+    # anything). ``eager`` mode asks the orchestrator to exercise the
+    # declared cc1 -> as -> ld stages inside the sandbox, which is opt-in
+    # because it pulls a real compiler stack into the rootfs.
+    parser.add_argument("--pipeline-mode", default="lazy", choices=["lazy", "eager"])
+    # B7: opt-in fuzz harness. Default is off (duration_sec=0). When
+    # --enable-fuzz is set we plumb a non-zero duration into the fuzz
+    # adapter via target_profile.fuzz_config.duration_sec.
+    parser.add_argument("--enable-fuzz", action="store_true",
+                        help="Run fuzz discover adapter (B7); opt-in because it consumes CPU")
+    parser.add_argument("--fuzz-duration-sec", type=int, default=60,
+                        help="How long to fuzz when --enable-fuzz is set (default: 60)")
+    parser.add_argument("--fuzz-engine", default="libfuzzer",
+                        choices=["afl", "libfuzzer", "honggfuzz"],
+                        help="Which fuzz engine to use when --enable-fuzz is set")
     parser.add_argument("--registry", default="")
     parser.add_argument("--scan-id", default="")
     parser.add_argument("--allow-synthetic-rpm-fixture", action="store_true")
     parser.add_argument("--run-track-a-tools", action="store_true", help="Execute available Track A adapters instead of writing a skipped wrapper")
+    parser.add_argument("--skip-track-a", action="store_true", help="Explicitly skip Track A even when mode would default to running it (standard/deep/full)")
     parser.add_argument("--track-b-output", default="", help="Optional Track B fixture/model JSON output to map into findings")
     parser.add_argument("--action-gate", default="", help="Optional action gate JSON file for Phase 3 host-exception decisions")
     parser.add_argument("--poc-dir", default="", help="Optional PoC directory to execute in the Phase 3 sandbox")
@@ -801,7 +914,7 @@ def main() -> int:
         validate_or_fail(scan_root, "track_b")
 
         update_phase(state, "phase_2", "running")
-        write_merge_verify_artifacts(scan_root, args.scan_id, env)
+        write_merge_verify_artifacts(scan_root, args.scan_id, env, registry_path=str(args.registry))
         update_phase(state, "phase_2", "done")
         validate_or_fail(scan_root, "phase_2")
 

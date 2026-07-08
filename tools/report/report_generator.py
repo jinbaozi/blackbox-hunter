@@ -36,6 +36,10 @@ DISPLAY_VALUES = {
     "skipped": "已跳过",
     "failed": "失败",
     "untested": "未测试",
+    # B3: distinguishes "sandbox didn't let the PoC run" from a real failure.
+    "sandbox_blocked": "被沙箱拦截",
+    "poc_error": "PoC 执行错误",
+    "sandbox_error": "沙盒执行错误",
 }
 
 
@@ -82,6 +86,27 @@ def display_list(values: list[Any] | None, empty: str = "none") -> str:
     if not values:
         return display_value(empty)
     return ", ".join(str(value) for value in values)
+
+
+def _render_coverage_gaps(gaps: list[Any]) -> str:
+    """A3: render structured gaps as a markdown table.
+
+    Back-compat: gaps may be either ``{kind, target, reason}`` dicts (new
+    shape from ``derive_coverage.compute``) or pre-existing flat dicts
+    (legacy hand-written ``phase_blocks`` shape). We accept both.
+    """
+    if not gaps:
+        return "缺口: 无"
+    if not all(isinstance(g, dict) and {"kind", "target"}.issubset(g.keys()) for g in gaps):
+        # Legacy / fallback shape: dump as JSON
+        return f"缺口: {json.dumps(gaps, sort_keys=True, ensure_ascii=False)}"
+    lines = ["缺口 (结构化):", "", "| kind | target | reason |", "| --- | --- | --- |"]
+    for g in gaps:
+        kind = display_value(g.get("kind", "unknown"))
+        target = str(g.get("target", ""))
+        reason = str(g.get("reason", ""))
+        lines.append(f"| {kind} | {target} | {reason} |")
+    return "\n".join(lines)
 
 
 def host_exception_invocations(state: dict[str, Any]) -> list[dict[str, Any]]:
@@ -139,7 +164,7 @@ def generate_report(scan_root: Path) -> str:
         f"验证统计: {json.dumps(verified.get('verification_stats', {}), sort_keys=True)}",
         "",
         "## 覆盖缺口",
-        f"缺口: {json.dumps(coverage.get('gaps', []), sort_keys=True)}",
+        _render_coverage_gaps(coverage.get("gaps", [])),
         "",
         "## 沙箱限制",
         f"引擎: {display_value(sandbox.get('engine', 'none'), 'none')}",

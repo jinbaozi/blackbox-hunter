@@ -1,0 +1,23 @@
+{
+  "finding_id": "TA-003",
+  "finding_status": "candidate",
+  "vulnerability": {
+    "title": "Missing error handling exits with success (fixture)",
+    "severity": "info",
+    "confidence": 0.4
+  },
+  "location": {
+    "binary": "/usr/bin/false"
+  },
+  "evidence": {
+    "description": "Fixture: binary returns 1 but caller assumes 0",
+    "reproduction_hint": "/usr/bin/false"
+  },
+  "attack_surface": {
+    "type": "cli"
+  },
+  "verification": {
+    "poc_status": "untested",
+    "expected_signal": {"type": "exit_code", "exit_code": 1}
+  }
+}

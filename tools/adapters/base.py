@@ -36,7 +36,7 @@ class FindingSignal:
 
     def to_json(self) -> dict[str, Any]:
         payload = asdict(self)
-        return {key: value for key, value in payload.items() if value not in (None, {}, [])}
+        return {key: _strip_none(value) for key, value in payload.items() if value not in (None, {}, [])}
 
 
 @dataclass
@@ -130,3 +130,35 @@ def read_text(path: Path) -> str:
 
 def read_json(path: Path) -> Any:
     return json.loads(read_text(path))
+
+
+def _strip_none(value: Any) -> Any:
+    """Recursively drop ``None`` leaves so the result is JSON-serializable with ``sort_keys=True``.
+
+    ``FindingSignal.to_json`` only filtered top-level ``None``; nested dicts (e.g.
+    ``metadata.raw`` carrying a cve-bin-tool row that has ``None`` columns) caused
+    ``json.dumps(..., sort_keys=True)`` to fail with ``'<' not supported between
+    instances of 'NoneType' and 'str'``. Recurse so both top-level and nested
+    Nones are removed before serialisation.
+    """
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        cleaned: dict[str, Any] = {}
+        for key, item in value.items():
+            if key is None:
+                continue
+            stripped = _strip_none(item)
+            if stripped is None or stripped in ({}, []):
+                continue
+            cleaned[key] = stripped
+        return cleaned
+    if isinstance(value, list):
+        cleaned_list: list[Any] = []
+        for item in value:
+            stripped = _strip_none(item)
+            if stripped is None:
+                continue
+            cleaned_list.append(stripped)
+        return cleaned_list
+    return value

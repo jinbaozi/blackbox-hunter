@@ -50,6 +50,22 @@ objdump -T <binary>
 strings -n 8 <binary>
 ```
 
+The Track A objdump adapter (`tools/adapters/objdump_disasm.py`) wraps
+the fallback with two safety guards (B1):
+
+- Per-binary hard size cap `MAX_BINARY_BYTES = 50 * 1024 * 1024`.
+  ELFs above this emit a `binary_skipped_too_large` signal and are NOT
+  fed to `objdump -d`. They are still inspected with `readelf
+  --dyn-syms --notes` if the binary falls in the
+  `(32 MiB, 50 MiB]` window.
+- Per-binary timeout `timeout_sec = min(60, max(5, size_mb // 5))`. The
+  Track A runner honours `ToolCommand.timeout_sec` and surfaces a
+  `TIMEOUT` marker in the captured output.
+
+For Track B in particular, when a binary exceeds 32 MiB the wrapper
+falls back to `readelf --dyn-syms --notes` instead of full
+disassembly, so analysis is bounded even on `cc1plus` / `libLLVM*.so`.
+
 ## Multi-Architecture Branch
 
 - `x86_64`/`amd64`: use radare2 and Ghidra; prefer Ghidra pseudo-C for top functions.
@@ -115,6 +131,30 @@ Additional high-value dimension cards may be used when scan mode and token budge
 - `crypto_tls_auth`
 - `filesystem_path_traversal`
 - `ipc_local_service`
+- `compiler_pipeline` (B5) — emits when `target_profile.pipeline.stages[]`
+  contains a stage whose `binary_path` is null while a corresponding
+  `wrapper_dispatch` exists. Headline scenario: a packaged compiler
+  declares `cc1` as its frontend but does not ship the binary, so
+  ``gcc → cc1`` execve()s a non-existent target. Trigger only when
+  `toolchain != "unknown"`; otherwise skip silently.
+- `language_runtime_stress` (B6) — emits when
+  `target_profile.detected_runtimes[]` is non-empty. Reads the smoke
+  PoC exit codes from `poc_results/runtime_<name>/exit_code.txt` and
+  classifies non-zero exits as `medium`-severity runtime findings.
+  ``attack_surface.type`` must be ``runtime`` per the B6 schema
+  extension. Not invoked in `quick` mode.
+
+## B7 Fuzz Discover (Track A Adjunct)
+
+When `target_profile.fuzz_config.duration_sec > 0`, the Track A runner
+also invokes the `fuzz` adapter (`tools/adapters/fuzz_discover.py`).
+The fuzz adapter is opt-in and off by default; orchestrators must set
+`duration_sec > 0` only when the user passes `--enable-fuzz`. Three
+engines are supported (`afl`, `libfuzzer`, `honggfuzz`); the chosen
+engine's binary must be available on `PATH` inside the dedicated
+`bbh-fuzz:local-imported` container. The adapter emits a single
+`fuzz_coverage_signal` Track A signal whose `metadata.crashes` count is
+forwarded to `coverage_report.fuzz_coverage_pct` by `derive_coverage`.
 
 ## Output Contract
 

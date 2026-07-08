@@ -21,6 +21,13 @@ ADAPTERS = {
     "lintian": "tools.adapters.lintian:LintianAdapter",
     "rpmlint": "tools.adapters.rpmlint:RpmlintAdapter",
     "dependency-parser": "tools.adapters.dependency_parser:DependencyParserAdapter",
+    # B1: per-binary timeout + size-cap objdump adapter (replaces the prior
+    # global timeout that hung on big cc1 ELFs).
+    "objdump": "tools.adapters.objdump_disasm:ObjdumpAdapter",
+    # B7: opt-in fuzz discover adapter. Default duration_sec=0 in target
+    # profile => no-op sentinel. --enable-fuzz in bbh_scan sets duration_sec
+    # to the user-supplied value before invoking this adapter.
+    "fuzz": "tools.adapters.fuzz_discover:FuzzDiscoverAdapter",
 }
 
 

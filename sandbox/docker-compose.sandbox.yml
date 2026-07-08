@@ -41,3 +41,11 @@ services:
       POC_SCRIPT: ${POC_SCRIPT:-/poc/run.sh}
       TIMEOUT: ${TIMEOUT:-300}
       OUTPUT_DIR: /workspace/results
+      # B8: sanitizer options exported into the PoC sandbox. abort_on_error
+      # is mandatory so a sanitizer violation terminates the run with a
+      # recognisable exit code (ASAN=42, MSAN=77, UBSAN=1). detect_leaks
+      # adds memory-leak detection for ASan; MSan ignores it.
+      SANITIZER: ${SANITIZER:-none}
+      ASAN_OPTIONS: ${ASAN_OPTIONS:-abort_on_error=1:detect_leaks=1:exitcode=42}
+      MSAN_OPTIONS: ${MSAN_OPTIONS:-exitcode=77}
+      UBSAN_OPTIONS: ${UBSAN_OPTIONS:-halt_on_error=1:print_stacktrace=1:exitcode=1}

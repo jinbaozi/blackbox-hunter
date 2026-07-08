@@ -1,0 +1,24 @@
+{
+  "finding_id": "TA-005",
+  "finding_status": "candidate",
+  "vulnerability": {
+    "title": "Format string vulnerability (fixture)",
+    "severity": "high",
+    "confidence": 0.8
+  },
+  "location": {
+    "binary": "/bin/echo"
+  },
+  "evidence": {
+    "description": "Unsafe-behavior fixture: payload is fed via stdin",
+    "unsafe_payload": "%s%s%s%s%s%s%s%s%n",
+    "reproduction_hint": "echo via stdin with format string"
+  },
+  "attack_surface": {
+    "type": "cli"
+  },
+  "verification": {
+    "poc_status": "untested",
+    "expected_signal": {"type": "unsafe_behavior"}
+  }
+}

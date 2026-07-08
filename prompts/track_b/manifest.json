@@ -15,7 +15,9 @@
   "extended_dimensions": [
     "crypto_tls_auth",
     "filesystem_path_traversal",
-    "ipc_local_service"
+    "ipc_local_service",
+    "compiler_pipeline",
+    "language_runtime_stress"
   ],
   "mode_defaults": {
     "quick": [
@@ -133,6 +135,25 @@
         "ipc_entry_points",
         "function_metadata",
         "body_excerpt"
+      ]
+    },
+    "compiler_pipeline": {
+      "path": "prompts/track_b/dimensions/compiler_pipeline.md",
+      "max_context_tokens": 2200,
+      "requires": [
+        "pipeline_stages",
+        "wrapper_dispatches",
+        "lto_support",
+        "elf_classification"
+      ]
+    },
+    "language_runtime_stress": {
+      "path": "prompts/track_b/dimensions/language_runtime_stress.md",
+      "max_context_tokens": 1800,
+      "requires": [
+        "detected_runtimes",
+        "runtime_poc_results",
+        "attack_surface"
       ]
     }
   }

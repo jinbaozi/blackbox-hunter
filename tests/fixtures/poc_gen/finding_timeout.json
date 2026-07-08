@@ -1,0 +1,23 @@
+{
+  "finding_id": "TA-002",
+  "finding_status": "candidate",
+  "vulnerability": {
+    "title": "Infinite loop in parser (fixture)",
+    "severity": "low",
+    "confidence": 0.55
+  },
+  "location": {
+    "binary": "/usr/bin/sleep"
+  },
+  "evidence": {
+    "description": "Infinite loop in parser fixture for PoC generator",
+    "reproduction_hint": "/usr/bin/sleep 9999"
+  },
+  "attack_surface": {
+    "type": "cli"
+  },
+  "verification": {
+    "poc_status": "untested",
+    "expected_signal": {"type": "timeout"}
+  }
+}

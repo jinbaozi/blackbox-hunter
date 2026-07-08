@@ -209,4 +209,37 @@ c7_errors = json.loads((workspace / "BBH-20260706-he0003" / "scan_state.json").r
 assert any("C7 violation" in item.get("reason", "") for item in c7_errors), c7_errors
 PY
 
+c7_errors = json.loads((workspace / "BBH-20260706-he0003" / "scan_state.json").read_text(encoding="utf-8"))["error_log"]
+assert any("C7 violation" in item.get("reason", "") for item in c7_errors), c7_errors
+PY
+
+# B9: assert the new dynamic-tracing exemptions are declared in
+# tools/host_exemptions.json. We don't run a full PoC cycle for these
+# (ltrace/strace-fork require an interactive debugger and a live PoC,
+# which is exercised by tests/e2e/full_workflow_dynamic.sh), we just
+# confirm the catalog contains them with the right metadata.
+python3 - "$ROOT/tools/host_exemptions.json" <<'PY'
+import json, sys
+from pathlib import Path
+
+exemptions = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+ids = {entry["id"]: entry for entry in exemptions["exemptions"]}
+
+# B9 added two new IDs
+for required in ("host-ltrace", "host-strace-fork"):
+    assert required in ids, f"missing host exemption: {required}"
+    entry = ids[required]
+    assert entry["category"] == "dynamic_tracing", entry
+    assert "phase_3" in entry["applies_to"], entry
+    # The contract: dynamic tracing must never widen to target-package
+    # code. target_is_target_package must be False or absent.
+    assert not entry.get("target_is_target_package"), entry
+    assert entry["requires_reason_field"] is True, entry
+    assert entry["requires_user_approval"] is True, entry
+
+# Pre-existing IDs still present (regression guard)
+for legacy in ("host-kernel-probe", "host-perf-profiling", "host-debugger-syscalls"):
+    assert legacy in ids, f"regression: {legacy} disappeared from host_exemptions.json"
+PY
+
 echo "host exception report validation passed"

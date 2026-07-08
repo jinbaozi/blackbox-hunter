@@ -1,0 +1,25 @@
+{
+  "finding_id": "TA-001",
+  "finding_status": "candidate",
+  "vulnerability": {
+    "title": "Crash on malformed input (fixture)",
+    "severity": "medium",
+    "confidence": 0.7
+  },
+  "location": {
+    "binary": "/usr/bin/true",
+    "function": "main"
+  },
+  "evidence": {
+    "description": "Crash on malformed input fixture for PoC generator",
+    "reproduction_hint": "/usr/bin/true --malformed"
+  },
+  "attack_surface": {
+    "type": "cli",
+    "entry_point": "--malformed"
+  },
+  "verification": {
+    "poc_status": "untested",
+    "expected_signal": {"type": "crash"}
+  }
+}

@@ -45,7 +45,23 @@
           "stripped": { "type": "boolean" },
           "setuid": { "type": "boolean" },
           "network_facing": { "type": "boolean" },
-          "priority": { "type": "integer", "minimum": 0, "maximum": 100 }
+          "priority": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "backend_role": {
+            "type": "string",
+            "enum": [
+              "wrapper",
+              "compiler_driver",
+              "compiler_frontend",
+              "assembler",
+              "linker",
+              "runtime_helper",
+              "language_runtime",
+              "interpreter",
+              "unknown"
+            ]
+          },
+          "is_wrapper": { "type": "boolean" },
+          "execve_target": { "type": ["string", "null"] }
         }
       }
     },
@@ -56,13 +72,75 @@
         "required": ["type", "entry_point"],
         "additionalProperties": false,
         "properties": {
-          "type": { "type": "string", "enum": ["network", "cli", "file", "ipc", "config", "env", "library"] },
+          "type": { "type": "string", "enum": ["network", "cli", "file", "ipc", "config", "env", "library", "runtime"] },
           "entry_point": { "type": "string" },
           "evidence": { "type": "string" }
         }
       }
     },
     "architectures": { "type": "array", "items": { "type": "string" } },
+    "fuzz_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "engine": { "type": "string", "enum": ["afl", "libfuzzer", "honggfuzz", "none"] },
+        "corpus_dir": { "type": "string" },
+        "harness_path": { "type": "string" },
+        "target_functions": { "type": "array", "items": { "type": "string" } },
+        "duration_sec": { "type": "integer", "minimum": 0 },
+        "asan_flags": { "type": "string" }
+      }
+    },
+    "detected_runtimes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "enum": ["openmp", "fortran", "go", "jvm", "python", "perl", "tcl", "lua"] },
+          "library": { "type": "string" },
+          "library_path": { "type": "string" },
+          "language": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "smoke_template": { "type": "string" }
+        }
+      }
+    },
+    "pipeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "toolchain": { "type": "string", "enum": ["gcc", "clang", "mixed", "unknown"] },
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string", "enum": ["frontend", "assembler", "linker", "lto"] },
+              "binary": { "type": "string" },
+              "binary_path": { "type": ["string", "null"] },
+              "inputs": { "type": "array", "items": { "type": "string" } },
+              "outputs": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "supports_lto": { "type": "boolean" },
+        "lto_stage": { "type": ["object", "null"], "additionalProperties": true },
+        "language_frontends": { "type": "array", "items": { "type": "string" } },
+        "wrapper_dispatches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "from": { "type": "string" },
+              "to": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
     "metadata": { "type": "object", "additionalProperties": true }
   }
 }
